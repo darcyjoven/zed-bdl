@@ -18,7 +18,8 @@ Genero BDL（`.4gl` / `.global`）与 Form（`.per`）的 Zed 扩展：语法高
 | 括号匹配 | `(` `)` / `[` `]` / `{` `}` |
 | 缩进 | BDL 按块结构（`IF`/`WHILE`/`FOR`/`FUNCTION`…）；`.per` **不动 LAYOUT** |
 | SQL 注入 | `.4gl` 里 `SELECT`/`INSERT`/`UPDATE`/`DELETE` 的 `sql_body` 按 SQL 高亮 |
-| LSP | 跳转、引用、悬停、文档/工作区符号、语法诊断（依赖 `bdl-lsp`） |
+| LSP | 跳转、引用、悬停、文档/工作区符号、语法诊断、字段校验（依赖 `bdl-lsp`） |
+| 格式化 | `.4gl` 关键字大小写 + 缩进（可配）；**`.per` 一律不格式化** |
 
 ## 前置：准备 `bdl-lsp`
 
@@ -64,6 +65,11 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
           "fileNotFoundDiagnostics": "warning",
           "unresolvedSourceDiagnostics": "warning",
           "searchPaths": []
+        },
+        "format": {
+          "keywords": "upper",
+          "indentStyle": "space",
+          "indentSize": 4
         }
       }
     }
@@ -88,6 +94,20 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
 |---|---|---|
 | `fieldDiagnostics` | `warning` | 4GL 字段不在引用的表单（.per）中的级别；也控制 .per 内部一致性检查；`off` 关闭 |
 | `perRoots` | `[]` | `.per` 的附加查找根（相对工作区根）；表单路径先按 4gl 同级 `per/` 目录解析 |
+
+`format.*` 控制 `.4gl` 的格式化（P4）：
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `keywords` | `unchanged` | 关键字大小写：`unchanged` / `upper` / `lower` |
+| `indentStyle` | `auto` | 缩进字符：`auto`（跟随编辑器）/ `tab` / `space` |
+| `indentSize` | `0` | 每级缩进宽度；`0` 表示跟随编辑器的 `tab_size` |
+
+> **`.per` 表单文件不做任何格式化**（`textDocument/formatting` 直接返回空）。
+> 格式化只改关键字大小写与行首缩进，不动空白、标点与换行；文件含语法错误时整体跳过。
+
+Zed 侧的缩进跟随由设置项 `tab_size` 与 `hard_tabs` 决定——`auto` 模式下
+编辑器请求什么服务器就用什么。
 
 ## 安装
 
