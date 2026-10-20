@@ -21,6 +21,7 @@ Genero BDL（`.4gl` / `.global`）与 Form（`.per`）的 Zed 扩展：语法高
 | LSP | 跳转、引用、悬停、文档/工作区符号、语法诊断、字段校验（依赖 `bdl-lsp`） |
 | 格式化 | `.4gl` 关键字大小写 + 缩进（可配）；**`.per` 一律不格式化** |
 | 部署 | 通过 `task: spawn` 调 `bdl-lsp deploy` 上传并远程编译（Zed 扩展 API 不支持任意命令） |
+| LSP 能力 | 补全、重命名、Code Action、语义 token（Zed 是否使用语义 token 见下方说明） |
 
 ## 前置：准备 `bdl-lsp`
 
@@ -202,6 +203,10 @@ node tests/verify-queries.mjs
 ## 已知限制
 
 - 扩展 API 不支持任意命令，部署/编译只能用 `.zed/tasks.json` 调用
+- **语义高亮**：服务器会发 LSP `semanticTokens`（只含用户自定义符号），
+  但 Zed 的着色走 tree-sitter `highlights.scm`，不消费 LSP semantic tokens。
+  Zed 侧的关键字/字符串/注释/数字高亮由 grammar 驱动，不受影响；
+  「用户定义的函数名显示为函数色」这一层在 Zed 里暂时看不到
   `bdl-lsp deploy`（P5，尚未实现）。
 - 自动下载 `bdl-lsp` 暂不排期，二进制需要自备。
 - 未在 Zed 里实测（本机无图形界面）；已用 `cargo check/build --target wasm32-wasip2`
