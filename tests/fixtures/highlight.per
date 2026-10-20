@@ -1,0 +1,59 @@
+-- 高亮样例：按 tree-sitter-per 的实际规则覆盖各小节与结构
+--
+-- 这份样例同时被 tests/verify-queries.mjs 用来验证 query 能编译并命中。
+-- 修改时请保持 0 ERROR：语法错误会让 query 命中统计失真，
+-- 也会让"高亮不生效"的排查变得难以区分是 query 错还是文件错。
+SCHEMA ds
+
+LAYOUT (TEXT="Sample")
+GRID
+{
+  [c1        ]  Order No:  [f01             ]
+  [c2        ]  Customer:  [f02             ]
+  [c3        ]  Amount:    [f03             ]
+}
+END
+END
+
+TABLES
+  customer
+END
+
+ATTRIBUTES
+EDIT f01 = customer.order_no, REQUIRED, UPSHIFT;
+EDIT f02 = customer.cust_name, REQUIRED;
+EDIT f03 = customer.amount, FORMAT="---,---,---&.&&";
+PHANTOM formonly.p_flag;
+END
+
+INSTRUCTIONS
+  SCREEN RECORD sr_cust(f01, f02, f03)
+  DELIMITERS "|"
+  DEFAULT SAMPLE = "9999"
+END
+
+KEYS
+  F1 = "Help"
+  ESC = "Cancel"
+END
+
+ACTION DEFAULTS
+  ACTION help (TEXT="Help")
+  ACTION cancel (TEXT="Cancel")
+END
+
+TOPMENU TopMenu1
+  GROUP form(TEXT="Form")
+    COMMAND about(TEXT="About")
+    COMMAND exit(TEXT="Exit")
+  END
+  GROUP database(TEXT="DataBase")
+    COMMAND select_db(TEXT="Select a database")
+  END
+END
+
+TOOLBAR Toolbar1
+  ITEM open(TEXT="Open")
+  SEPARATOR sep1
+  ITEM quit(TEXT="Quit")
+END

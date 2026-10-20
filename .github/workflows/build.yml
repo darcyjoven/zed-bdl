@@ -1,0 +1,128 @@
+name: build
+
+# Zed 扩展的 CI：Rust wasm 编译 + 清单校验 + Tree-sitter query 校验。
+#
+# 为什么必须校验 query 和清单：
+#   1. Zed 加载扩展时编译 languages/*/*.scm，任何一处节点名/字面量拼错
+#      都会让**整份** query 编译失败，表现为"高亮全没了"；
+#   2. extension.toml 里的 id/schema_version/grammar rev 写错时，
+#      Zed 只会说 "failed to load extension"。
+#   这两类错误都只出现在 zed: open log 里，所以全部前置到 CI。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  wasm:
+    name: Rust → wasm32-wasip2
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出扩展
+        uses: actions/checkout@v4
+        with:
+          path: zed-extension
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - name: 缓存 cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zed-extension/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('zed-extension/Cargo.lock') }}
+
+      - name: 编译检查
+        working-directory: zed-extension
+        run: cargo check --target wasm32-wasip2
+
+      - name: 发布构建
+        working-directory: zed-extension
+        run: cargo build --release --target wasm32-wasip2
+
+      - name: 确认产物是 wasm
+        working-directory: zed-extension
+        run: |
+          set -eux
+          ls -lh target/wasm32-wasip2/release/*.wasm
+          # wasm 魔数：\0asm => 0061736d
+          magic=$(head -c 4 target/wasm32-wasip2/release/*.wasm | xxd -p)
+          echo "magic=$magic"
+          test "$magic" = "0061736d"
+
+  manifest:
+    name: 清单校验
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出扩展
+        uses: actions/checkout@v4
+        with:
+          path: zed-extension
+
+      - name: 校验 extension.toml 与 languages/*/config.toml
+        working-directory: zed-extension
+        run: python3 tests/verify-manifest.py
+
+      - name: 校验 grammar rev 真实存在
+        # extension.toml 里的 rev 必须能在 grammar 仓库里找到，
+        # 否则用户安装扩展时 Zed 拉不到 grammar，安装直接失败。
+        run: |
+          set -eux
+          for pair in "bdl tree-sitter-bdl" "per tree-sitter-per"; do
+            set -- $pair
+            lang=$1
+            dir=$2
+            rev=$(python3 -c "import tomllib;print(tomllib.load(open('zed-extension/extension.toml','rb'))['grammars']['$lang']['rev'])")
+            echo "$lang rev=$rev"
+            git init -q "$dir" 2>/dev/null || true
+            ( cd "$dir" \
+              && git remote add origin "https://github.com/darcyjoven/$dir.git" 2>/dev/null || true \
+              && git fetch -q --depth 1 origin "$rev" \
+              && git cat-file -e "$rev" ) \
+              || { echo "grammar $lang 的 rev $rev 在 $dir 里不存在"; exit 1; }
+          done
+
+  queries:
+    name: Tree-sitter query 校验
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出扩展
+        uses: actions/checkout@v4
+        with:
+          path: zed-extension
+
+      - name: 检出 tree-sitter-bdl（必须与 zed-extension 并列）
+        uses: actions/checkout@v4
+        with:
+          repository: darcyjoven/tree-sitter-bdl
+          path: tree-sitter-bdl
+
+      - name: 检出 tree-sitter-per（必须与 zed-extension 并列）
+        uses: actions/checkout@v4
+        with:
+          repository: darcyjoven/tree-sitter-per
+          path: tree-sitter-per
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 安装 tree-sitter CLI
+        # 版本必须与 grammar 仓库生成 parser 时一致（LANGUAGE_VERSION 15）
+        run: npm install -g tree-sitter-cli@0.26.5
+
+      - name: 校验 query
+        working-directory: zed-extension
+        run: node tests/verify-queries.mjs

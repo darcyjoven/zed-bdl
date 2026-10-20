@@ -1,0 +1,22 @@
+name = "Genero Form"
+grammar = "per"
+path_suffixes = ["per"]
+line_comments = ["-- "]
+tab_size = 2
+
+# .per 的 LAYOUT 段是按列对齐的"画图"区域，缩进必须保持原样。
+# 这里只声明通用括号；缩进由 indents.scm 按小节处理。
+
+brackets = [
+    { start = "{", end = "}", close = true, newline = true, not_in = ["string", "comment"] },
+    { start = "[", end = "]", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "(", end = ")", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["string"] },
+]
+
+word_characters = ["_"]
+
+# 只按小节标题缩进；不做通用的 "以 = 结尾就缩进" 之类的启发式，
+# 因为 ATTRIBUTES 里每条都是 `...;` 结尾，启发式会把它整段越缩越深。
+increase_indent_pattern = "(?i)^\\s*(layOut|topmenu|toolbar|attributes|instructions|tables|keys|action\\s+defaults)\\b.*$"
+decrease_indent_pattern = "(?i)^\\s*end\\b"

@@ -1,0 +1,29 @@
+id = "4gl-full"
+name = "Genero BDL & Form (Full)"
+schema_version = 1
+version = "0.1.0"
+authors = ["darcy <darcy_joven@live.com>"]
+description = "Genero BDL (.4gl/.global) and Form (.per) support: syntax highlighting, outline, brackets, indentation, and a full LSP (navigation, hover, diagnostics)."
+repository = "https://github.com/darcyjoven/zed-bdl"
+
+# 与轻量 bdl-plugin 共存：那个只提供 grammar，本扩展额外挂 language server。
+# 注意：Zed 的 extension id 不能与已发布扩展重复，`4gl-full` 是刻意区分的 id。
+
+[grammars.bdl]
+repository = "https://github.com/darcyjoven/tree-sitter-bdl"
+rev = "d4e21e6f4137b217ff4e6eaa0933359b3634362b"
+
+[grammars.per]
+repository = "https://github.com/darcyjoven/tree-sitter-per"
+rev = "eb2307bf8229fa4b8f03f2d21b63ee3fb1214c74"
+
+# languages 里写的名字必须与 languages/<dir>/config.toml 的 name 完全一致。
+[language_servers.bdl-lsp]
+name = "Genero BDL LSP"
+languages = ["Genero BDL", "Genero Form"]
+
+# LSP 的 languageId 与 Zed 的语言名不一定相同，这里显式映射。
+# bdl-lsp 服务端按这两个 id 选择 grammar（见 internal/parser）。
+[language_servers.bdl-lsp.language_ids]
+"Genero BDL" = "bdl"
+"Genero Form" = "per"

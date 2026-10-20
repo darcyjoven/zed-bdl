@@ -1,0 +1,20 @@
+# 统一换行：源码一律 LF，避免 Windows 上 core.autocrlf=true 改坏脚本与 query。
+# Tree-sitter query 对 CRLF 不敏感，但 config.toml / extension.toml 里的
+# 正则（increase_indent_pattern）会受行尾影响，统一 LF 最稳。
+* text=auto eol=lf
+
+*.4gl    text eol=lf
+*.global text eol=lf
+*.per    text eol=lf
+
+*.rs  text eol=lf
+*.scm text eol=lf
+*.toml text eol=lf
+*.py  text eol=lf
+*.mjs text eol=lf
+*.yml text eol=lf
+
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+*.wasm binary
