@@ -20,6 +20,7 @@ Genero BDL（`.4gl` / `.global`）与 Form（`.per`）的 Zed 扩展：语法高
 | SQL 注入 | `.4gl` 里 `SELECT`/`INSERT`/`UPDATE`/`DELETE` 的 `sql_body` 按 SQL 高亮 |
 | LSP | 跳转、引用、悬停、文档/工作区符号、语法诊断、字段校验（依赖 `bdl-lsp`） |
 | 格式化 | `.4gl` 关键字大小写 + 缩进（可配）；**`.per` 一律不格式化** |
+| 部署 | 通过 `task: spawn` 调 `bdl-lsp deploy` 上传并远程编译（Zed 扩展 API 不支持任意命令） |
 
 ## 前置：准备 `bdl-lsp`
 
@@ -123,6 +124,34 @@ Zed 侧的缩进跟随由设置项 `tab_size` 与 `hard_tabs` 决定——`auto`
    **Genero BDL** / **Genero Form**，以及语言服务器是否启动。
 
 排查用 `zed: open log`；需要更详细的日志时从终端以 `zed --foreground` 启动。
+
+## 部署与远程编译
+
+Zed 的扩展 API 不能执行任意命令，所以部署走 **Zed task** 调 CLI，
+配置与 VSCode 共用 `.bdl-lsp/deploy.json`。
+
+最小 `.zed/tasks.json`：
+
+```json
+[
+  {
+    "label": "BDL: 部署预演",
+    "command": "bdl-lsp deploy -workspace \"$ZED_WORKTREE_ROOT\" -dry-run",
+    "reveal": "always"
+  },
+  {
+    "label": "BDL: 部署当前文件",
+    "command": "bdl-lsp deploy -workspace \"$ZED_WORKTREE_ROOT\" \"$ZED_FILE\"",
+    "reveal": "always"
+  }
+]
+```
+
+运行：`Cmd/Ctrl + Shift + P` → `task: spawn` → 选 label。
+
+注意 task 用的是**登录 shell 的 PATH**，与 LSP 二进制的查找路径不同；
+需要把 `bdl-lsp` 放进 PATH 或在 task 里写绝对路径。完整说明（含配置项、
+退出码、常见问题）见 bdl-lsp 仓库的 [docs/DEPLOY-ZED.md](https://github.com/darcyjoven/bdl-lsp/blob/main/docs/DEPLOY-ZED.md)。
 
 ## 与 VSCode 扩展的关系
 
