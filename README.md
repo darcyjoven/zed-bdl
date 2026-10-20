@@ -59,7 +59,12 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
       },
       "settings": {
         "generoVersion": "2.50",
-        "missingDiagnostics": "warning"
+        "missingDiagnostics": "warning",
+        "globals": {
+          "fileNotFoundDiagnostics": "warning",
+          "unresolvedSourceDiagnostics": "warning",
+          "searchPaths": []
+        }
       }
     }
   }
@@ -68,6 +73,14 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
 
 `settings` 会作为 `workspace/didChangeConfiguration` 的内容下发给服务器，
 字段与 VSCode 扩展的 `bdl.*` 一致。
+
+`globals.*` 是 GLOBALS 模组全局变量相关的配置（P3a）：
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `fileNotFoundDiagnostics` | `warning` | `GLOBALS "路径"` 的目标文件找不到时的级别 |
+| `unresolvedSourceDiagnostics` | `warning` | 变量使用处查不到任何定义时的级别；`off` 关闭 |
+| `searchPaths` | `[]` | 附加解析根（相对工作区根）；解决跨模块目录层级不一致的引用 |
 
 ## 安装
 
