@@ -82,6 +82,13 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
 | `unresolvedSourceDiagnostics` | `warning` | 变量使用处查不到任何定义时的级别；`off` 关闭 |
 | `searchPaths` | `[]` | 附加解析根（相对工作区根）；解决跨模块目录层级不一致的引用 |
 
+`fieldDiagnostics` / `perRoots` 是字段校验相关的配置（P3b）：
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `fieldDiagnostics` | `warning` | 4GL 字段不在引用的表单（.per）中的级别；也控制 .per 内部一致性检查；`off` 关闭 |
+| `perRoots` | `[]` | `.per` 的附加查找根（相对工作区根）；表单路径先按 4gl 同级 `per/` 目录解析 |
+
 ## 安装
 
 1. 安装 Rust 与 `wasm32-wasip2` target：
