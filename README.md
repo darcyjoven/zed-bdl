@@ -93,6 +93,8 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
 
 ```bash
 bdl-lsp link import -csv gal_file.csv -root /path/to/project
+# 或者让 CLI 直接去取（P7-D-3），跑完 Zed 侧自动重载：
+BDL_ORA_PASSWORD=... bdl-lsp link sync -source golang -host dbhost -service PROD -user readonly
 ```
 
 | 字段 | 默认 | 说明 |
@@ -102,6 +104,7 @@ bdl-lsp link import -csv gal_file.csv -root /path/to/project
 | `moduleRoots` | `[]` | 模组根；空 = 自动探测 `tiptop` / `topcust` |
 | `globalModules` | `["sub","lib","qry"]` | 对所有程序可见的模组（扁平规则） |
 | `maxAgeDays` | `7` | 资料过期提示阈值（只在资料文件上给 hint） |
+| `sync.*` | 全关 | 采集（P7-D-3）：`enable` / `source`(golang/command/file) / `interval` / `onStart` / `db.*` / `command` / `file`。**Zed 侧照发配置即可**，密码走环境变量 `BDL_ORA_PASSWORD` 或 `.link/secrets.json` |
 
 `globals.*` 是 GLOBALS 模组全局变量相关的配置（P3a）：
 
