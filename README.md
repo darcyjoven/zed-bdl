@@ -72,6 +72,13 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
           "keywords": "upper",
           "indentStyle": "space",
           "indentSize": 4
+        },
+        "link": {
+          "enable": true,
+          "dataDir": ".link",
+          "moduleRoots": [],
+          "globalModules": ["sub", "lib", "qry"],
+          "maxAgeDays": 7
         }
       }
     }
@@ -81,6 +88,20 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
 
 `settings` 会作为 `workspace/didChangeConfiguration` 的内容下发给服务器，
 字段与 VSCode 扩展的 `bdl.*` 一致。
+
+`link.*` 是程序链接资料（P7-D）的配置。资料本身由 CLI 生成，Zed 侧只读：
+
+```bash
+bdl-lsp link import -csv gal_file.csv -root /path/to/project
+```
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `enable` | `true` | 关掉后 `function-not-found` 与 `link-data-*` 都不生效 |
+| `dataDir` | `.link` | 资料目录（相对项目根） |
+| `moduleRoots` | `[]` | 模组根；空 = 自动探测 `tiptop` / `topcust` |
+| `globalModules` | `["sub","lib","qry"]` | 对所有程序可见的模组（扁平规则） |
+| `maxAgeDays` | `7` | 资料过期提示阈值（只在资料文件上给 hint） |
 
 `globals.*` 是 GLOBALS 模组全局变量相关的配置（P3a）：
 
