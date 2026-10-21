@@ -128,6 +128,96 @@ function tryQuery(grammarDir, queryFile, sampleFile) {
   }
 }
 
+/**
+ * 用 tree-sitter parse 解析样例，重建语法树并抽出容器信息。
+ *
+ * 这是**独立于 outline.scm 的真相源**：语法树里 function 节点覆盖哪几行、
+ * 里面有哪些 define、每个 define 有几个 name: 标识符，都是客观事实，
+ * 不受 query 怎么写影响。用它来检验 outline.scm 产出的层级是否正确。
+ *
+ * 容器 = function / report / main。每个容器记录：
+ *   start, end  —— 容器节点在源码中的区间
+ *   defines     —— 容器内部每个 define 语句声明的**变量名标识符**区间
+ *                  （一条 define 可声明多个变量，各是一个标识符）
+ *
+ * 关键细节：tree-sitter 的 parse 输出里，字段是**子行**：
+ *   (function [61, 0] - [67, 12]
+ *     name: (identifier [61, 9] - [61, 18])      ← 函数自己的名字，不是变量
+ *     (define [62, 2] - [63, 24]
+ *       name: (identifier [62, 9] - [62, 17])    ← 变量 1
+ *       types: (...)
+ *       name: (identifier [63, 9] - [63, 17])    ← 变量 2（同一条 define）
+ *       types: (...)))
+ * 所以必须按"缩进比 define 深"来归属 name: 行，否则会把函数名、
+ * 参数名一并当成变量。
+ */
+function parseContainers(grammarDir, sampleFile) {
+  let out;
+  try {
+    out = execFileSync(
+      "tree-sitter",
+      ["parse", sampleFile],
+      {
+        cwd: grammarDir,
+        env: { ...process.env },
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+  } catch {
+    return { containers: [] };
+  }
+
+  const lines = out.split("\n");
+  const containers = [];
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    const m = line.match(
+      /^\s*\((\w+)\s*\[(\d+), (\d+)\] - \[(\d+), (\d+)\]/,
+    );
+    if (!m) continue;
+    const indent = line.length - line.trimStart().length;
+    const kind = m[1];
+    const start = [Number(m[2]), Number(m[3])];
+    const end = [Number(m[4]), Number(m[5])];
+
+    if (!["function", "report", "main"].includes(kind)) continue;
+
+    const c = { kind, start, end, defines: [] };
+    containers.push(c);
+
+    // 在容器块内前瞻：找每个 define 节点，再收集它的 name: 子行
+    for (let j = idx + 1; j < lines.length; j++) {
+      const l2 = lines[j];
+      const ind2 = l2.length - l2.trimStart().length;
+      if (ind2 <= indent) break; // 出了容器块
+      const dm = l2.match(
+        /^\s*\(define\s*\[(\d+), (\d+)\] - \[(\d+), (\d+)\]/,
+      );
+      if (!dm) continue;
+      const dIndent = ind2;
+      // 收集该 define 块内所有 name: 标识符（缩进更深）
+      for (let k = j + 1; k < lines.length; k++) {
+        const l3 = lines[k];
+        const ind3 = l3.length - l3.trimStart().length;
+        if (ind3 <= dIndent) break;
+        const nm = l3.match(
+          /^\s*name: \(identifier \[(\d+), (\d+)\] - \[(\d+), (\d+)\]/,
+        );
+        if (nm) {
+          c.defines.push({
+            start: [Number(nm[1]), Number(nm[2])],
+            end: [Number(nm[3]), Number(nm[4])],
+          });
+        }
+      }
+    }
+  }
+
+  return { containers };
+}
+
 // ---------------------------------------------------------------------------
 // 大纲 @item 区间唯一性（P7-A-1 回归防护）
 //
@@ -225,16 +315,44 @@ function zedDepths(items) {
   const pointLess = (p, q) =>
     p[0] !== q[0] ? p[0] < q[0] : p[1] < q[1];
 
+  // 栈里同时存 end 与该条目在 sorted 里的序号，便于回溯父级。
   const stack = [];
   const out = [];
   for (const it of sorted) {
-    while (stack.length > 0 && pointLess(stack[stack.length - 1], it.end)) {
+    while (stack.length > 0 && pointLess(stack[stack.length - 1].end, it.end)) {
       stack.pop();
     }
-    out.push({ ...it, depth: stack.length });
-    stack.push(it.end);
+    const parent = stack.length > 0 ? stack[stack.length - 1].order : null;
+    out.push({ ...it, depth: stack.length, parent });
+    stack.push({ end: it.end, order: out.length - 1 });
   }
   return out;
+}
+
+
+/** 点是否落在 [start,end] 区间内（含端点）。 */
+function pointInRange(pt, start, end) {
+  const le = (a, b) => (a[0] !== b[0] ? a[0] < b[0] : a[1] <= b[1]);
+  return le(start, pt) && le(pt, end);
+}
+
+/**
+ * 区间 A 是否覆盖区间 B（B 整体落在 A 内）。
+ */
+function rangeCovers(a, b) {
+  const le = (p, q) => (p[0] !== q[0] ? p[0] < q[0] : p[1] <= q[1]);
+  return le(a.start, b.start) && le(b.end, a.end);
+}
+
+/**
+ * 判断一个 @item 区间是否是"叶子"（标识符大小）。
+ *
+ * 叶子的判据：区间很短且不跨行——@item 与 @name 同绑一个 identifier。
+ * 容器（函数/MAIN/MENU）的 item 覆盖整个块，通常跨多行。
+ * 单行的 MENU/DIALOG 容器极少见（body 为空才有），语料里没有。
+ */
+function isLeafItem(it) {
+  return it.start[0] === it.end[0] && it.end[1] - it.start[1] <= 64;
 }
 
 /** 对指定 query 文件跑一个样例，返回 @item 区间列表（失败时返回 null）。 */
@@ -342,6 +460,7 @@ for (const [lang, grammarDir] of Object.entries(GRAMMARS)) {
   }
 }
 
+
 // ---------------------------------------------------------------------------
 // 大纲 @item 区间唯一性（P7-A-1 回归防护）
 // ---------------------------------------------------------------------------
@@ -399,27 +518,137 @@ for (const [lang, grammarDir] of Object.entries(GRAMMARS)) {
     );
   }
 
-  // ── 断言 2：按 Zed 的真实算法算出的层级必须全为 0 ──
+  // ── 断言 2：容器可以有子级，但叶子的父级不能是叶子 ──
   //
-  // 断言 1 只查"区间完全相同"，查不出"区间相交/重叠"这种更常见的层级
-  // （P7-B-3 的根因：函数 item 覆盖整个函数体，内部变量落在其中）。
-  // 这里直接复刻 Zed 的 depth 算法，把"会被误判成子级"的条目揪出来。
+  // 正确的条目模型（见 outline.scm 文件头）：
+  //   容器（函数/报表/MAIN/MENU）的 item 绑整个节点，内部条目归它
+  //   之下——这是**有意的折叠**，不是 bug（用户要求变量归属函数）。
+  //   叶子（DEFINE/TYPE/CONSTANT 的 identifier）的 item 只是名字本身，
+  //   不该包含任何条目。
+  //
+  // 所以检查是：如果一个条目的父级是叶子（区间为标识符大小），
+  // 说明同一条语句的多个名字互相嵌套了（DEFINE i,j INTEGER 出现
+  // j 挂在 i 下——最初报的 bug 形态）。
   const depths = zedDepths(ranges);
-  const nested = depths.filter((d) => d.depth > 0);
-  if (nested.length === 0) {
-    ok(`${lang}/outline.scm: ${depths.length} 个条目层级均为 0（无假层级）`);
+  const leafParents = [];
+  for (const d of depths) {
+    if (d.parent === null) continue;
+    const parent = depths[d.parent];
+    if (isLeafItem(parent)) leafParents.push({ child: d, parent });
+  }
+  if (leafParents.length === 0) {
+    ok(
+      `${lang}/outline.scm: ${depths.length} 个条目，叶子条目均无子级` +
+        `（容器折叠正常）`,
+    );
   } else {
-    const sample = nested
+    const sample = leafParents
       .slice(0, 5)
-      .map((d) => `${d.name}(${d.start}..${d.end}) depth=${d.depth}`)
-      .join(", ");
+      .map(
+        (e) =>
+          `${e.child.name} 挂在了叶子 ${e.parent.name}(${e.parent.start}..${e.parent.end}) 下`,
+      )
+      .join("; ");
     fail(
-      `${lang}/outline.scm: ${nested.length}/${depths.length} 个条目会被 Zed 判为子级\n` +
-        `      示例：${sample}${nested.length > 5 ? " …" : ""}\n` +
-        `      常见原因：@item 绑在包含子条目的父节点上（如整个函数体），\n` +
-        `                应绑到最小语义单元（函数名/报表名/MAIN 关键字）上`,
+      `${lang}/outline.scm: ${leafParents.length} 个条目的父级是叶子` +
+        `（同语句多名字互相嵌套）\n` +
+        `      示例：${sample}\n` +
+        `      修法：@item 与 @name 同绑 identifier，不要绑整条语句`,
     );
   }
+
+  // ── 断言 3：容器内部的变量必须归属该容器（可折叠）─────────────────
+  //
+  // 这是用户明确要求的行为：
+  //   "函数内归属的变量应该归属函数，可以折叠，现在和函数同级别了"
+  //
+  // 真相源是 tree-sitter parse 的语法树——函数块覆盖哪几行、里面有哪些
+  // 变量，都是客观事实，与 outline.scm 怎么写无关。
+  //
+  // 检验方式：对语法树里每个容器，取它内部的每个变量标识符，在 outline
+  // 产出的条目里找到区间相同的那一条，然后沿 zedDepths 的父级链往上走，
+  // **必须能走到该容器**。走不到 = 变量与函数平级 = 回归。
+  //
+  // 这条断言能抓住 1ee95bf 的回归：那个版本把函数的 @item 缩到名字节点，
+  // 函数体不再被覆盖，内部变量就掉出了函数的区间。
+  const { containers } = parseContainers(grammarDir, fixture);
+  const depthList = zedDepths(ranges);
+  const orphanVars = [];
+  for (const c of containers) {
+    if (c.defines.length === 0) continue;
+    // 找到该容器在 outline 里的条目
+    const cItem = ranges.find(
+      (r) =>
+        r.start[0] === c.start[0] &&
+        r.start[1] === c.start[1] &&
+        r.end[0] === c.end[0] &&
+        r.end[1] === c.end[1],
+    );
+    if (!cItem) {
+      orphanVars.push({
+        c,
+        vars: c.defines,
+        why: "容器本身没有对应的 outline 条目",
+      });
+      continue;
+    }
+    const cIdx = depthList.findIndex(
+      (d) =>
+        d.start[0] === cItem.start[0] &&
+        d.start[1] === cItem.start[1] &&
+        d.end[0] === cItem.end[0] &&
+        d.end[1] === cItem.end[1],
+    );
+    // 容器内部的每个变量条目，其父级链必须包含容器
+    for (const v of c.defines) {
+      const vIdx = depthList.findIndex(
+        (d) =>
+          d.start[0] === v.start[0] &&
+          d.start[1] === v.start[1] &&
+          d.end[0] === v.end[0] &&
+          d.end[1] === v.end[1],
+      );
+      if (vIdx < 0) {
+        orphanVars.push({ c, vars: [v], why: "变量没有对应的 outline 条目" });
+        continue;
+      }
+      // 沿父级链往上找容器
+      let found = false;
+      let p = depthList[vIdx].parent;
+      while (p !== null) {
+        if (
+          depthList[p].start[0] === cItem.start[0] &&
+          depthList[p].start[1] === cItem.start[1]
+        ) {
+          found = true;
+          break;
+        }
+        p = depthList[p].parent;
+      }
+      if (!found) {
+        orphanVars.push({ c, vars: [v], why: "父级链上没有所属容器" });
+      }
+    }
+  }
+  if (orphanVars.length === 0) {
+    const withVars = containers.filter((c) => c.defines.length > 0).length;
+    ok(
+      `${lang}/outline.scm: ${withVars} 个容器的内部变量均归属所属容器` +
+        `（可折叠）`,
+    );
+  } else {
+    const first = orphanVars[0];
+    fail(
+      `${lang}/outline.scm: ${orphanVars.length} 个变量未归属所属容器` +
+        `（会与容器平级、无法折叠）\n` +
+        `      示例：${first.c.kind} @ [${first.c.start}] 内 ${first.vars.length} 个变量` +
+        `（${first.why}）\n` +
+        `      修法：容器的 @item 绑整个节点（(function ...) @item），` +
+        `不要绑名字节点；叶子（DEFINE/TYPE/常量）才绑 name: 标识符`,
+    );
+  }
+
+
 }
 
 // ---------------------------------------------------------------------------
@@ -515,32 +744,34 @@ if (fs.existsSync(CORPUS)) {
     // 保证可复现且不太慢。
     const outlinePath = path.join(repoRoot, "languages", lang, "outline.scm");
     if (!fs.existsSync(outlinePath)) continue;
-    let nestedFiles = 0;
-    let nestedItems = 0;
-    let firstNested = "";
+    let badFiles = 0;
+    let badItems = 0;
+    let firstBad = "";
     for (const f of files) {
       const r = tryQuery(grammarDir, outlinePath, f);
       if (!r.ok) continue;
       const depths = zedDepths(extractItemRanges(r.output));
-      const nested = depths.filter((d) => d.depth > 0);
-      if (nested.length > 0) {
-        nestedFiles++;
-        nestedItems += nested.length;
-        if (!firstNested) {
-          firstNested = `${f}: ${nested
+      const bad = depths.filter(
+        (d) => d.parent !== null && isLeafItem(depths[d.parent]),
+      );
+      if (bad.length > 0) {
+        badFiles++;
+        badItems += bad.length;
+        if (!firstBad) {
+          firstBad = `${f}: ${bad
             .slice(0, 3)
-            .map((d) => `${d.name}(${d.start}..${d.end}) depth=${d.depth}`)
+            .map((d) => `${d.name} 挂在叶子 ${depths[d.parent].name} 下`)
             .join(", ")}`;
         }
       }
     }
-    if (nestedItems === 0) {
-      ok(`${lang}/outline.scm: ${files.length} 个语料文件均无假层级`);
+    if (badItems === 0) {
+      ok(`${lang}/outline.scm: ${files.length} 个语料文件叶子均无子级`);
     } else {
       fail(
-        `${lang}/outline.scm: ${nestedFiles}/${files.length} 个语料文件有假层级` +
-          `（共 ${nestedItems} 个条目）\n      示例：${firstNested}\n` +
-          `      常见原因：@item 绑在包含子条目的父节点上，应绑到最小语义单元`,
+        `${lang}/outline.scm: ${badFiles}/${files.length} 个语料文件` +
+          `存在叶子当父级（共 ${badItems} 个条目）\n      示例：${firstBad}\n` +
+          `      修法：@item 与 @name 同绑 identifier，不要绑整条语句`,
       );
     }
   }
