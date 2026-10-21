@@ -89,7 +89,12 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
 `settings` 会作为 `workspace/didChangeConfiguration` 的内容下发给服务器，
 字段与 VSCode 扩展的 `bdl.*` 一致。
 
-`link.*` 是程序链接资料（P7-D）的配置。资料本身由 CLI 生成，Zed 侧只读：
+`link.*` 是程序链接资料（P7-D）的配置。资料本身由 CLI 生成，Zed 侧只读。
+
+> **UI 限制（P7-E）**：VSCode 有一个「链接资料」TreeView（点击可跨文件跳转），
+> Zed 没有等价的视图 API，也**不会**把链路塞进大纲——`documentSymbol` 是
+> VSCode 大纲的数据源，塞进去会让 VSCode 里多出不可跳转的假符号。
+> 在 Zed 里查看链接关系请用 `bdl-lsp link status` 或 `cmd/link-audit`。
 
 ```bash
 bdl-lsp link import -csv gal_file.csv -root /path/to/project
