@@ -1,0 +1,43 @@
+-- outline 样例：.per 的大纲结构覆盖
+--
+-- 用途：tests/verify-queries.mjs 的"@item 区间两两不同"断言。
+--
+-- .per 与 .4gl 不同：表单里每个 item 都是**独立节点**
+-- （attribute_item / phantom_item / screen_record_entry …），
+-- 不存在"一条语句声明多个名字"的结构，所以本断言理论上不会触发。
+-- 保留这个 fixture 是为了：一旦将来 grammar 引入类似结构，
+-- 断言能立刻发现，而不是等用户在 Zed 里看到错乱的大纲。
+--
+-- 请保持 0 ERROR。
+
+SCHEMA ds
+
+LAYOUT (TEXT = "Outline Sample")
+GRID
+{
+  [c1        ]  Order No:  [f01             ]
+  [c2        ]  Customer:  [f02             ]
+  [c3        ]  Amount:    [f03             ]
+  [c4        ]  Remark:    [f04             ]
+}
+END
+END
+
+TABLES
+  customer
+  order_head
+END
+
+ATTRIBUTES
+EDIT f01 = customer.order_no, REQUIRED, UPSHIFT;
+EDIT f02 = customer.cust_name, REQUIRED;
+EDIT f03 = customer.amount, FORMAT = "---,---,---&.&&";
+EDIT f04 = customer.remark;
+PHANTOM formonly.p_flag;
+PHANTOM formonly.p_other;
+END
+
+INSTRUCTIONS
+  SCREEN RECORD sr_cust(f01, f02, f03)
+  SCREEN RECORD sr_more(f02, f03, f04)
+END

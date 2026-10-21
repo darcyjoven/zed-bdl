@@ -129,6 +129,65 @@ function tryQuery(grammarDir, queryFile, sampleFile) {
 }
 
 // ---------------------------------------------------------------------------
+// 大纲 @item 区间唯一性（P7-A-1 回归防护）
+//
+// 为什么需要：
+//   Zed 用 @item 的**区间**构建大纲的父子关系。若同一份 query 产出两个
+//   区间完全相同的 @item，Zed 会认为后一个是前一个的子节点。
+//
+//   这个坑在"一条语句声明多个名字"的语法上必然触发：
+//     DEFINE l_name LIKE type_file.chr20, l_sql STRING
+//   grammar 里这是**单个 define 节点带多个 name: 字段**，若把 @item 绑在
+//   整条语句上，两个变量会产出区间相同的两个 match → 大纲里 l_sql
+//   变成 l_name 的子节点（VSCode 不受影响，它走 LSP documentSymbol）。
+//
+//   Zed 的层级问题只在 GUI 可见、排查成本极高，所以必须用断言在 CI 上挡。
+//
+// 检查方式：用 tree-sitter CLI 跑 outline.scm，解析输出里每个 match 的
+// @item 起止位置，断言两两不同。
+// ---------------------------------------------------------------------------
+
+/**
+ * 从 `tree-sitter query` 的输出里提取每个 pattern match 的 @item 区间。
+ *
+ * 输出格式（每个 match 一段）：
+ *   pattern: 6
+ *     capture: 1 - item, start: (2, 4), end: (2, 52), text: `...`
+ *
+ * 注意 item 后面可能没有 text（区间跨行时 CLI 不打印），所以只依赖 start/end。
+ */
+function extractItemRanges(queryOutput) {
+  const ranges = [];
+  // 一个 match 可能有多行，用 pattern: 切段更稳
+  const blocks = queryOutput.split(/^\s*pattern: \d+\s*$/m);
+  for (const block of blocks) {
+    // 同一 match 里 @item 只有一个；多个 capture 行时取 item 那行
+    const m = block.match(
+      /capture: \d+ - item, start: \((\d+), (\d+)\), end: \((\d+), (\d+)\)/,
+    );
+    if (m) {
+      ranges.push({ start: `(${m[1]},${m[2]})`, end: `(${m[3]},${m[4]})` });
+    } else {
+      // main / menu 这类规则只捕获 item、没有 name，行里没有 " - item"
+      const m2 = block.match(
+        /capture: item, start: \((\d+), (\d+)\), end: \((\d+), (\d+)\)/,
+      );
+      if (m2) {
+        ranges.push({ start: `(${m2[1]},${m2[2]})`, end: `(${m2[3]},${m2[4]})` });
+      }
+    }
+  }
+  return ranges;
+}
+
+/** 对指定 query 文件跑一个样例，返回 @item 区间列表（失败时返回 null）。 */
+function itemRangesFor(grammarDir, queryFile, sampleFile) {
+  const r = tryQuery(grammarDir, queryFile, sampleFile);
+  if (!r.ok) return null;
+  return extractItemRanges(r.output);
+}
+
+// ---------------------------------------------------------------------------
 // 主流程
 // ---------------------------------------------------------------------------
 
@@ -223,6 +282,65 @@ for (const [lang, grammarDir] of Object.entries(GRAMMARS)) {
     } else {
       ok(`${lang}/${file}: 编译通过，命中 ${lines} 处`);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 大纲 @item 区间唯一性（P7-A-1 回归防护）
+// ---------------------------------------------------------------------------
+
+console.log("\n大纲 @item 区间唯一性");
+
+for (const [lang, grammarDir] of Object.entries(GRAMMARS)) {
+  const outline = path.join(repoRoot, "languages", lang, "outline.scm");
+  if (!fs.existsSync(outline)) continue; // 可选文件
+
+  // outline.4gl 是专门为这个断言写的：含多变量 DEFINE / 多 CONSTANT / 多 TYPE
+  const fixture = path.join(
+    repoRoot,
+    "tests",
+    "fixtures",
+    lang === "bdl" ? "outline.4gl" : "outline.per",
+  );
+  if (!fs.existsSync(fixture)) {
+    fail(`${lang}/outline.scm: 缺少 fixture ${fixture}（该断言必须有样例）`);
+    continue;
+  }
+
+  const ranges = itemRangesFor(grammarDir, outline, fixture);
+  if (ranges === null) {
+    fail(`${lang}/outline.scm: query 无法编译，跳过区间检查`);
+    continue;
+  }
+  if (ranges.length === 0) {
+    fail(`${lang}/outline.scm: 在 ${path.basename(fixture)} 上没有命中任何 @item`);
+    continue;
+  }
+
+  // 断言：所有 @item 的 (start,end) 两两不同
+  const seen = new Map();
+  const dups = [];
+  for (const r of ranges) {
+    const key = `${r.start}..${r.end}`;
+    if (seen.has(key)) {
+      dups.push({ key, name: r.name ?? "" });
+    } else {
+      seen.set(key, true);
+    }
+  }
+
+  if (dups.length === 0) {
+    ok(`${lang}/outline.scm: ${ranges.length} 个 @item 区间两两不同`);
+  } else {
+    // 明确指出哪些区间撞了，便于定位是哪种语法触发的
+    const dupKeys = [...new Set(dups.map((d) => d.key))];
+    fail(
+      `${lang}/outline.scm: ${dups.length} 个 @item 区间重复（Zed 会误判为父子层级）\n` +
+        `      重复区间：${dupKeys.slice(0, 5).join(", ")}${dupKeys.length > 5 ? " …" : ""}\n` +
+        `      常见原因：@item 绑在"一条语句多个名字"的父节点上，应绑到名字节点本身\n` +
+        `      示例：把 (define name: (identifier) @name) @item 改成\n` +
+        `            (define name: (identifier) @name @item)`,
+    );
   }
 }
 
