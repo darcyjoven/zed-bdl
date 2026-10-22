@@ -6,6 +6,7 @@ Genero BDL（`.4gl` / `.global`）与 Form（`.per`）的 Zed 扩展：语法高
 
 > 扩展 id 为 **`4gl-full`**，与轻量扩展 [`bdl`](https://github.com/darcyjoven/bdl-plugin)
 > （只有 grammar、没有 LSP）共存，两者可以同时安装。
+> 完整操作手册：[docs/USER-GUIDE.md](docs/USER-GUIDE.md)（含截图/录屏占位与设置总表）。
 > 本仓库只放 Zed 交付物；计划、测试脚本、过程记录统一在本地 `bdl-lsp` 仓库。
 > v1 验证平台：**Linux + Windows**（macOS 后续补齐）。
 
@@ -62,10 +63,10 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
       },
       "settings": {
         "generoVersion": "2.50",
-        "missingDiagnostics": "warning",
+        "diagnostics": {
+          "record-member-unknown": "off"
+        },
         "globals": {
-          "fileNotFoundDiagnostics": "warning",
-          "unresolvedSourceDiagnostics": "warning",
           "searchPaths": []
         },
         "format": {
@@ -120,19 +121,20 @@ BDL_ORA_PASSWORD=... bdl-lsp link sync -source golang -host dbhost -service PROD
 | `maxAgeDays` | `7` | 资料过期提示阈值（只在资料文件上给 hint） |
 | `sync.*` | 全关 | 采集（P7-D-3）：`enable` / `source`(golang/command/file) / `interval` / `onStart` / `db.*` / `command` / `file`。**Zed 侧照发配置即可**，密码走环境变量 `BDL_ORA_PASSWORD` 或 `.link/secrets.json` |
 
+`diagnostics` 是**唯一**的诊断级别入口：键为诊断码，值为
+`off`/`error`/`warning`/`information`/`hint`。旧专用键已删除。完整码表见
+[使用手册第 4 节](docs/USER-GUIDE.md#4-诊断与检查)。
+
 `globals.*` 是 GLOBALS 模组全局变量相关的配置（P3a）：
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `fileNotFoundDiagnostics` | `warning` | `GLOBALS "路径"` 的目标文件找不到时的级别 |
-| `unresolvedSourceDiagnostics` | `warning` | 变量使用处查不到任何定义时的级别；`off` 关闭 |
 | `searchPaths` | `[]` | 附加解析根（相对工作区根）；解决跨模块目录层级不一致的引用 |
 
-`fieldDiagnostics` / `perRoots` 是字段校验相关的配置（P3b）：
+`perRoots` 是字段校验相关的配置（P3b）：
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `fieldDiagnostics` | `warning` | 4GL 字段不在引用的表单（.per）中的级别；也控制 .per 内部一致性检查；`off` 关闭 |
 | `perRoots` | `[]` | `.per` 的附加查找根（相对工作区根）；表单路径先按 4gl 同级 `per/` 目录解析 |
 
 `format.*` 控制 `.4gl` 的格式化（P4）：
