@@ -73,6 +73,11 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
           "indentStyle": "space",
           "indentSize": 4
         },
+        "ignore": {
+          "files": ["build/**", "**/*.bak.4gl"],
+          "fields": ["tmp_*"],
+          "forms": ["**/per/old.per"]
+        },
         "link": {
           "enable": true,
           "dataDir": ".link",
@@ -90,6 +95,10 @@ Zed 设置示例（`~/.config/zed/settings.json`）：
 字段与 VSCode 扩展的 `bdl.*` 一致。
 
 `link.*` 是程序链接资料（P7-D）的配置。资料本身由 CLI 生成，Zed 侧只读。
+
+`ignore.*` 是诊断忽略列表（P8）：`files` 命中后整文件静默并排除出工作区索引，
+`fields` 只屏蔽 `field-not-in-form`，`forms` 屏蔽该表单的字段类诊断。
+改完 `ignore.files` 后建议 `editor: restart language server`，让索引重建时应用排除。
 
 > **UI 限制（P7-E）**：VSCode 有一个「链接资料」TreeView（点击可跨文件跳转），
 > Zed 没有等价的视图 API，也**不会**把链路塞进大纲——`documentSymbol` 是
