@@ -192,7 +192,7 @@ Zed 的扩展 API 不能执行任意命令，所以部署走 **Zed task** 调 CL
 
 注意 task 用的是**登录 shell 的 PATH**，与 LSP 二进制的查找路径不同；
 需要把 `bdl-lsp` 放进 PATH 或在 task 里写绝对路径。完整说明（含配置项、
-退出码、常见问题）见 bdl-lsp 仓库的 [docs/DEPLOY-ZED.md](https://github.com/darcyjoven/bdl-lsp/blob/main/docs/DEPLOY-ZED.md)。
+退出码、常见问题）见本仓库的 [docs/USER-GUIDE.md](docs/USER-GUIDE.md) §7（Zed 侧暂停维护，命令名以 tiptop 为准）。
 
 ## 与 VSCode 扩展的关系
 
