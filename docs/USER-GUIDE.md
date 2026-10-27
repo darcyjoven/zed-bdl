@@ -497,7 +497,7 @@ Zed 设置。
 | 键 | 默认 | 作用 |
 |---|---|---|
 | `diagnostics` | `{}` | 按诊断码覆盖级别；唯一诊断入口 |
-| `format.keywords` | `unchanged` | `unchanged`/`upper`/`lower` |
+| `format.keywords` | `unchanged` | `unchanged`/`upper`/`lower`；`lower` 同时让补全的关键字用小写 |
 | `format.indentStyle` | `auto` | `auto`/`tab`/`space` |
 | `format.indentSize` | `0` | 缩进宽度，0 跟随编辑器 |
 
