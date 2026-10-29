@@ -30,7 +30,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 | 语义高亮 | `"semantic_tokens": "combined"` | ✅ `0.2.0`：扩展自带 `semantic_token_rules.json`（8 条规则，带主题回退） |
 | 设置生效与轻量档默认 | 自动 | ✅ `0.2.0`：有效配置从 `initializationOptions` 下发，且缺省补 `link/schema mode=off` |
 | 链接资料采集 / 导入 / 更新 | task → `tiptop link …` | ✅ 可用 |
-| 链接关系查看 | `/bdl-link-chain <代码>`（文本）/ Code Lens 挂在 **MAIN 函数头** | ✅ `0.2.0` 文本版可查；🔧 Code Lens 待 `bdl-lsp` 实现（PLAN Z-P3-3） |
+| 链接关系查看 | `/bdl-link-chain <代码>`（文本）/ Code Lens 挂在 **MAIN 函数头** | ✅ 文本版可查；✅ Code Lens **服务端已实现**（`bdl-lsp`，开 `"code_lens": "on"` 后可见；**点击行为待 Zed 实机确认**） |
 | 字段资料采集 / 同步 | task → `tiptop schema …` | ✅ 可用 |
 | 表 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ `0.2.0`：`/bdl-schema-tables`、`/bdl-schema-columns` |
 | 上传 / 下载 / 预演上传（单文件） | task → `tiptop upload` / `download` | ✅ 可用 |
@@ -294,7 +294,7 @@ tiptop deploy -list
 |---|---|---|---|
 | 语言智能 | ✅ | ✅ | 同一个 `bdl-lsp`，行为一致 |
 | 命令面板 | ✅ 33 条 | ⬇️ task + slash command | Zed 无命令注册 API |
-| 链接资料视图 | ✅ 侧边栏三级树 | ⬇️ Code Lens 挂 MAIN 函数头 | Zed 无树视图 API；每子文件一条、可点、上限 10 |
+| 链接资料视图 | ✅ 侧边栏三级树 | ⬇️ Code Lens 挂 MAIN 函数头 | Zed 无树视图 API；每子文件一条、上限 10 + 纯文本汇总；服务端已实现，点击行为待实机确认 |
 | 字段资料视图 | ✅ 树 + 过滤 + 勾选 | ⬇️ slash 文本列表 | 过滤靠正则参数；批量同步用 task |
 | 进度条 / 取消 | ✅ 通知栏 | ⬇️ task 终端 + 重跑取消 | — |
 | 输出面板 | ✅ `4gl` / `4gl 任务` | ⬇️ task 终端 + `zed: open log` | — |

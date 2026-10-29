@@ -407,9 +407,14 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 > 📷 待补：`tiptop link status` 的中文输出（链数、生成时间、模组根）（docs/images/zed/09-link-status.png）
 > 🎬 待补：`tiptop link sync` 全量采集进度（采集/扫描源码/成链/写入完成）（docs/images/zed/10-link-sync-progress.mp4）
 
-### 3.2 在 Zed 里查看链接关系 [✅ 0.2.0 已落地（`/bdl-link-chain`）/ 🔧 计划中·P3（Code Lens）]
+### 3.2 在 Zed 里查看链接关系 [✅ 文本版（`/bdl-link-chain`）/ ✅ Code Lens 服务端已实现（点击行为待实机）]
 
-**计划（Z-P3-3）**：`bdl-lsp` 实现 `textDocument/codeLens`，把**链内子文件**各做一条 Code Lens 挂在 **MAIN 程序块**头上（数据来自链接资料内存树），上限默认 10 条 + 一条「…共 M 个」汇总行。在 Zed 上可行是因为 **Code Lens 是宿主的 LSP 客户端功能**：服务端实现，用户在 `languages."Genero BDL"` 下开 `"code_lens": "on"`（**默认 `off`**）即可看到。
+**Code Lens 已由 `bdl-lsp` 实现**（`textDocument/codeLens`，2026-10-29）：把**链内子文件**各做一条 Code Lens 挂在 **MAIN 程序块**那一行（数据来自链接资料内存树），标题是 `模组/代码`，**上限 `link.lensMax`（默认 10）**，超出时最后一条是纯文本汇总；文件不在磁盘上时给纯文本（不挂命令，避免点了没反应）。
+
+怎么用：① 采集链接资料；② `link.mode` 不是 `off`；③ 在 `languages."Genero BDL"` 下开 `"code_lens": "on"`（**默认 `off`**）。Code Lens 是**宿主的 LSP 客户端功能**，服务端实现即可渲染。
+
+> **点击行为待实机确认（PLAN Z-P2-1）**：Zed 是否把 lens 的 `command` 转成 `workspace/executeCommand`、以及是否支持服务端反向的 `window/showDocument`。命令是 `bdl.openLink`；即使点击不生效，也可从 **`lsp command selector`** 手动触发同一条命令（兜底），或者用上面的 `/bdl-link-chain` 文本视图。
+> 另一前置：`bdl-lsp` 当前**最近的 Release 是 v0.3.14**，Code Lens 只在 main 上——自动下载拿到的是 v0.3.14；要让所有人用上，需要给 `bdl-lsp` 打一个新 tag（待授权）。
 
 > **Z-P2-1 是硬前置**：需要有 GUI 的机器验证 ① 同一 range 的多条 lens 是否各占一行；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件。若 ② 不成立就改用备选方案（终端清单 + 命令面板）并同步改文档。
 
@@ -919,7 +924,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | `lsp.bdl-lsp.binary.env` | object | `{}` | 启动语言服务器的附加环境变量 |
 | `lsp.bdl-lsp.initialization_options` | object | 无 | **逃生口**：启动时下发的配置（优先级最高） |
 | `languages."Genero BDL".semantic_tokens` | string | `"off"` | 语义高亮开关（`combined` 打开，见 §6.4） |
-| `languages."Genero BDL".code_lens` | string | `"off"` | Code Lens 开关（P3 后用，见 §3.2） |
+| `languages."Genero BDL".code_lens` | string | `"off"` | Code Lens 开关（**服务端已实现**；开 `"on"` 后 MAIN 头上出现链内子文件的 lens，见 §3.2） |
 | `languages."Genero Form".semantic_tokens` | string | `"off"` | 同上（语言名必须写全） |
 
 ### 8.2 项目级配置 `.bdl-lsp/config.json` [✅ 当前可用（可提交）]
