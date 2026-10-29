@@ -7,7 +7,7 @@
 | 扩展 id | **`4gl-full`**（仓库 `zed-bdl`；可与只有 grammar 的轻量扩展 `bdl` 共存） |
 | 本手册对应版本 | 扩展 **`0.2.0`**（阶段见 [PLAN §7](PLAN.md)） |
 | 语言服务器 | `bdl-lsp` **v0.3.14**（已有 Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`） |
-| 采集 / 部署 CLI | `tiptop` 源码 **0.1.10**（**尚无 tag、无 Release**，只能手工构建） |
+| 采集 / 部署 CLI | `tiptop` **v0.1.10**（四平台 GitHub Release + `SHA256SUMS`；2026-10-29 首次发布） |
 | 参照物 | VSCode 插件 `4gl-full` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏树视图） |
 | v1 承诺平台 | **Linux + Windows**（macOS 后续补齐） |
 
@@ -92,9 +92,9 @@ Zed 命令面板（cmd-shift-p / ctrl-shift-p）→ 输入 zed: install dev exte
 | 二进制 | 作用 | 当前获取方式 |
 |---|---|---|
 | `bdl-lsp` | 语言服务器（stdio LSP）+ `check` CLI | 已有四平台 GitHub Release，可直接下载；也可手工构建 |
-| `tiptop` | 链接/字段资料采集、上传下载、生产端执行、整包部署 | **无 Release**，只能手工构建（源码 0.1.10） |
+| `tiptop` | 链接/字段资料采集、上传下载、生产端执行、整包部署 | **已有四平台 GitHub Release（v0.1.10）**，可自动下载；也可手工构建（源码 0.1.10） |
 
-**① 自动下载【✅ `bdl-lsp` 已落地（0.2.0，Z-P4-1）；`tiptop` 待其 Release（Z-P3-4 → Z-P4-2）】**
+**① 自动下载【✅ 0.2.0：`bdl-lsp`（Z-P4-1）与 `tiptop`（Z-P3-4 + Z-P4-2）都已可用】**
 
 四级本地查找全部落空时，扩展会**兜底**从 GitHub Release 下载（`latest_github_release` → 按平台拼资产名 →
 `download_file` 解包 → `make_file_executable` → 清旧版本目录），状态用
@@ -105,6 +105,8 @@ Zed 命令面板（cmd-shift-p / ctrl-shift-p）→ 输入 zed: install dev exte
 | Linux x64 | `bdl-lsp-linux-amd64.tar.gz` |
 | macOS Intel / Apple Silicon | `bdl-lsp-darwin-amd64.tar.gz` / `bdl-lsp-darwin-arm64.tar.gz` |
 | Windows x64 | `bdl-lsp-windows-amd64.zip` |
+
+`tiptop` 同样有四个平台产物（`tiptop-<os>-<arch>.tar.gz|.zip`，含 `SHA256SUMS`）。
 
 - **本地已有二进制时永远优先**：只有「设置路径 → `BDL_LSP_PATH`/`TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/` → `PATH`」全部落空才会下载。
 - 缓存：扩展工作目录下按版本分目录（如 `bdl-lsp-0.3.14/`），同版本再次启动直接复用。
@@ -894,7 +896,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | `ext.deploy.enable` / `ext.build.enable` | bool | `false` | 仅作配置记录（**扩展与 task 都不读**，Zed 也没有按钮显隐）；是否跑 task 由你自己决定 |
 | `ext.build.4gl.preview` / `compile` / `link` | string | 见 §5.3 默认模板 | 4GL 三条命令模板 |
 | `ext.build.per.preview` / `compile` / `form` | string | 见 §5.3 默认模板 | Form 三条命令模板 |
-| `ext.download.bdlLsp` / `ext.download.tiptop` | string | `"auto"` | 自动下载开关 `auto \| off`（键缺省 = `auto`）。`bdl-lsp` 已可用（0.2.0）；`tiptop` 待其 Release。**只在四级本地查找全落空时才下载** |
+| `ext.download.bdlLsp` / `ext.download.tiptop` | string | `"auto"` | 自动下载开关 `auto \| off`（键缺省 = `auto`）。两者都已可用（`tiptop` v0.1.10 起有 Release）。**只在四级本地查找全落空时才下载** |
 
 **③ Zed 宿主键**（不是本扩展的 `settings`，由 Zed 直接消费）：
 

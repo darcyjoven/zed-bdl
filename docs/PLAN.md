@@ -49,7 +49,7 @@
 |---|---|---|
 | `vscode-bdl`（4gl-full） | **0.9.2**，`bin/` 内置 `bdl-lsp` + `tiptop`，33 命令 / 50 设置键 / 2 视图 / 55 条 menus / 27 activationEvents / 0 keybindings | `vscode-extension/package.json:2,5,60,531-1019` |
 | `bdl-lsp` | 源码 **0.3.14**，tag `v0.3.14`，`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS` | `bdl-lsp/main.go:35`、`release.yml` |
-| `tiptop` | 源码 **0.1.10**，**无 tag、无 release workflow**，CI 只有 `build.yml` | `tiptop/main.go:40`、`.github/workflows/` |
+| `tiptop` | **v0.1.10**（2026-10-29 首次发布）；新增 `release.yml`：tag `v*` → 四平台产物 + `SHA256SUMS` | `tiptop/main.go:40`、`.github/workflows/release.yml` |
 | `zed-bdl`（本仓库） | **0.2.0**（P0 已落地）；`src/` 拆为 `lib.rs` + `config.rs` + `binary.rs`；10 个 `.scm`；**17 项**清单校验 + 47 项 query 校验 + 3 个单元测试 | `extension.toml:4`、`Cargo.toml:3`、`tests/` |
 | 本地已构建二进制 | `bdl-lsp 0.3.13`、`tiptop 0.1.8` —— **都过期**，`tiptop` 旧二进制缺 `download` / `-region` / `-login-profile` | 实跑 `artifacts/bin/* version` |
 
@@ -69,7 +69,7 @@
 | 旧结论 | 实测更正 |
 |---|---|
 | 「Zed 侧原样透传用户设置，服务端兜底 true」 | **更严重**：`lsp.bdl-lsp.settings` 根本不会到达 `bdl-lsp`（服务端从不发 `workspace/configuration`）。自定义键、`link.mode`、`diagnostics` 在 Zed 上今天**全部无效**。→ Z-P0-3 / Z-P3-1 |
-| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已满足**：`bdl-lsp` 已有 tag + release workflow + 四平台产物；只剩 `tiptop` 没有。→ Z-P3-4 / Z-P4 |
+| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已完全满足**：`bdl-lsp`（v0.3.14）与 `tiptop`（v0.1.10，2026-10-29 首发）都有四平台 Release + `SHA256SUMS`。→ Z-P4-1 / Z-P4-2 均已落地 |
 | 「跨仓库文档 `bdl-lsp/docs/PENDING.md` 是待办唯一清单」 | 该文件**已不存在**（现只有 `DIAGNOSTICS.md` + `FEATURES.md`）；VSCode 侧唯一待办是 `vscode-bdl/docs/TODO.md`，Zed 侧唯一待办是**本文件**。 |
 
 > 另需注意：`vscode-bdl/docs/FEATURES.md` 头部仍写 0.6.2、`COMMANDS.md` 里的命令数与设置键数互相矛盾、文档写了 `bdl/linkReferences` 但源码从未发送该请求。**追平时一律以源码/`package.json` 为准，不要抄 VSCode 侧文档的数字。**
@@ -296,9 +296,9 @@ zed.dev 官方语义：
 
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
-| 二进制内置（平台包） | ✅ | ❌ | ✅ **Z-P4-1 已落地**（`bdl-lsp` 自动下载；本地已有则优先不下载）；`tiptop` 侧等 Z-P3-4 的 Release | Z-P4-1 / Z-P4-2 |
+| 二进制内置（平台包） | ✅ | ❌ | ✅ **Z-P4-1 / Z-P4-2 都已落地**：`bdl-lsp`（Release v0.3.14）与 `tiptop`（Release v0.1.10）都能按平台自动下载；本地已有则优先不下载 | Z-P4-1 / Z-P4-2 |
 | `bdl-lsp` Release | — | ✅ 已有 v0.3.14 + 四平台 + SHA256SUMS | 直接可用 | — |
-| `tiptop` Release | — | ❌ 无 tag / 无 release workflow | 🔒 仿 `bdl-lsp/release.yml` 加发布流水线 | Z-P3-4 |
+| `tiptop` Release | — | ✅ **已发 v0.1.10**（四平台 + `SHA256SUMS`，2026-10-29） | 流水线 `tiptop/.github/workflows/release.yml`；tag 推送自动出包 | Z-P3-4 |
 | 下载状态反馈 | ✅ 进度条 | ❌ | 🔧 `set_language_server_installation_status` + slash 文本 | Z-P4-3 |
 | 版本兼容矩阵 | ⚠️ 未解（VSCode P-10） | ⚠️ artifacts 二进制过期 | 🔧 `/bdl-env-check` 显示三方版本与最低要求 | Z-P4-4 |
 | 平台覆盖 | Linux/Windows 已验，macOS 待验 | v1 只承诺 Linux+Windows | 实机清单区分必须/后续 | Z-P5-1 |
@@ -368,12 +368,14 @@ cargo build --release --target wasm32-wasip2
 
 ### P3 · 跨仓库（executeCommand / Code Lens / tiptop Release 已授权；标 ⚠️ 的两项待确认）
 
+> **进展（2026-10-29）**：**Z-P3-2 已完成**（`bdl-lsp@9e48960`：`workspace/executeCommand` + 5 条命令，5 个协议级用例通过，`go test ./...` 全绿）。**Z-P3-4 已完成**（`tiptop` release.yml + tag **v0.1.10**，四平台产物 + `SHA256SUMS` 实测可用）。**Z-P3-3（Code Lens）待实机验证结论（Z-P2-1）**；Z-P3-1（workspace/configuration）与 Z-P3-6（workspaceSymbolProvider）仍待确认。
+
 | # | 任务 | 仓库 | 要做的事 | 验收 |
 |---|---|---|---|---|
 | **Z-P3-1** ⚠️**待确认** | `workspace/configuration` 支持（本次新增发现） | `bdl-lsp` | 初始化后向客户端请求 `workspace/configuration`（section `bdl`），把结果 `cfg.Apply`；后续 `didChangeConfiguration` 保持兼容 | 协议级测试；Zed 里改 `lsp.bdl-lsp.settings` 后**无需重启**生效（实机）。**不做也可**：设置仅在服务器启动时下发，改完需重启 |
 | **Z-P3-2** | `workspace/executeCommand` 通道 | `bdl-lsp` | 加 `ExecuteCommandProvider`，把 `bdl/linkTree` / `bdl/linkReferences` / `bdl/schemaTables` / `bdl/schemaColumns` / `bdl/forceParse` 转接为标准命令（参数用 `arguments` 数组） | 协议级测试；VSCode 侧继续用自定义请求，**不受影响** |
 | **Z-P3-3** | `textDocument/codeLens`（**与 VSCode 侧 P1-8 同一份实现，两端共用**） | `bdl-lsp` | 链内子文件各一条 lens 挂 **MAIN 头上**（数据来自 `link.Resolver.Tree()`，纯内存）；上限 `bdl.link.lensMax`（默认 10）+ 汇总行；函数级反查用 `wsindex.CallsOf` | 协议级测试；Zed 实机按 Z-P2-1 的结论渲染/点击；VSCode 侧作为 TreeView 的补充视图 |
-| **Z-P3-4** | tag + 四平台 Release | `tiptop` | 仿 `bdl-lsp/.github/workflows/release.yml`：`v*` tag 触发，`linux-amd64` / `darwin-amd64` / `darwin-arm64` / `windows-amd64`，产物名 `tiptop-<os>-<arch>.tar.gz|.zip` + `SHA256SUMS`，prerelease 判定同 bdl-lsp | tag 推送后 Release 有 4 个产物 + SHA256SUMS |
+| **Z-P3-4** ✅ | tag + 四平台 Release | `tiptop` | **已完成**：新增 `release.yml`（tag `v*` + dispatch，四平台原生 runner，检出兄弟目录 bdl-lsp；ref = 显式输入 > bdl-lsp 最近 Release tag > main），已打 **v0.1.10** 并推送 | ✅ Release v0.1.10 实测有 4 个产物 + `SHA256SUMS`；下载校验和通过、`tiptop version` = 0.1.10、`download`/`exec` 子命令在 |
 | **Z-P3-5** | 文档同步 | `bdl-lsp` / `tiptop` | `FEATURES.md` 补 `workspace/configuration`、`executeCommand`、Code Lens 行；`tiptop` 补 Release | 两处口径一致 |
 | ~~Z-P3-6~~ | ⚠️**待确认**：声明 `workspaceSymbolProvider: true` | `bdl-lsp` | 服务端已实现 `workspace/symbol`，但 `InitializeResult` 没声明该 capability；Zed 的「项目符号」可能因此不生效 | 一行修复 + 实机核实（§11.2 #19）；**先核实再改** |
 | ~~Z-P3-7~~ | `vscode-bdl/docs/TODO.md` §3.5 Zed 章节更新 | `vscode-bdl` | **未授权**（用户只授权了 bdl-lsp/tiptop）；需要时单独确认，或由本文件取代 | — |
@@ -384,13 +386,13 @@ cargo build --release --target wasm32-wasip2
 > 平台资产名 → `download_file` → `make_file_executable` → 清旧版本目录；四级本地查找全落空才下载；
 > `ext.download.bdlLsp=off` 可关；`set_language_server_installation_status` 三态上报；
 > 资产名已对 `api.github.com` 实测（`bdl-lsp-linux-amd64.tar.gz` 等 4 个 + SHA256SUMS 均存在），
-> 新增 2 个单测）。**Z-P4-2 代码已就绪但被封在 Z-P3-4（tiptop 还没 Release）之后**。
+> 新增 2 个单测）。**Z-P4-2 也已可用**：tiptop v0.1.10 Release 已发布，同一套 `ensure_tools` 代码路径生效。
 > 待实机：§11.2 #16。
 
 | # | 任务 | 落点 | 验收 | 依赖 |
 |---|---|---|---|---|
 | **Z-P4-1** | `bdl-lsp` 自动下载：`latest_github_release` → `current_platform()` 拼资产名（`bdl-lsp-<os>-<arch>.tar.gz|.zip`）→ 缓存到扩展目录 → `make_file_executable` → 清旧版本目录；设置 `ext.download.bdlLsp = auto\|off` | `src/lib.rs` | 无本地二进制时自动下载成功；删缓存后能重下；下载失败给出可操作错误 | bdl-lsp Release（已有） |
-| **Z-P4-2** | `tiptop` 自动下载（同上，Windows 用 `.zip`） | `src/lib.rs` | 同上 | **Z-P3-4** |
+| **Z-P4-2** ✅ | `tiptop` 自动下载（同上，Windows 用 `.zip`） | `src/download.rs` | 与 Z-P4-1 同一实现（`ensure_tools`）；资产名已对 v0.1.10 实测 | Z-P3-4 ✅ |
 | **Z-P4-3** | 下载状态显示：`set_language_server_installation_status`（`CheckingForUpdate` / `Downloading` / `Failed(msg)`） | `src/lib.rs` | 失败时用户能看到原因而不是"服务器起不来" | — |
 | **Z-P4-4** | 版本兼容提示：`/bdl-env-check` 显示三方版本并提示最低要求（矩阵写在文档，不在代码里硬拦） | `src/lib.rs`、USER-GUIDE | 错配时提示清晰 | Z-P1-4 |
 | **Z-P4-5**（可选） | `runnables.scm`：把 `MAIN`/`FUNCTION` 标为可运行，标签绑定到编译/链接 task（Zed 的"行内 ▶"替代编辑器按钮） | `languages/bdl/runnables.scm`、文档 | 只在真实可用后再写；需要 `tags` 与 task 对齐 | Z-P1-2 |
@@ -564,7 +566,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
   └─ 门槛：协议级测试 + 实机清单 11–15
 
 【第五轮 · 无感分发】
-  Z-P4-1/2 自动下载（bdl-lsp 先，tiptop 依赖 Z-P3-4）
+  Z-P4-1/2 自动下载（两个都已完成：bdl-lsp v0.3.14 / tiptop v0.1.10）
   Z-P4-3 下载状态提示
   Z-P4-4 版本兼容提示
   └─ 门槛：实机清单 16

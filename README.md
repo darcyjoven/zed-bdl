@@ -38,7 +38,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 | 整包部署 | task → `tiptop deploy -dry-run / -list` | ✅ 可用（CLI） |
 | 只读查询（资料状态、部署目标、环境自检） | slash command | ✅ `0.2.0`：8 条 `/bdl-…`（见 §4.2） |
 | 工程初始化（生成 `.zed/{settings,tasks,bdl-tool}.json`） | task → `scripts/zed/init-workspace.{sh,ps1}` | ✅ `0.2.0`（交互式提问，不写密码） |
-| 二进制自动下载 | 首次打开时 | 🔧 计划中（`bdl-lsp` 已有 Release；`tiptop` 需先建 Release） |
+| 二进制自动下载 | 首次打开时 | ✅ `0.2.0`：`bdl-lsp` 与 `tiptop` 都有四平台 Release，本地找不到时按平台自动下载 |
 | 编辑器标题栏按钮 / 状态栏 / 侧边栏树 / 输出面板 / Problems 注入 | — | ❌ Zed 无对应 API（永久差异，见 §6） |
 
 ---
@@ -57,7 +57,7 @@ Zed 命令面板 → zed: install dev extension → 选择本仓库目录
 
 `bdl-lsp`（语言服务器）与 `tiptop`（资料/部署 CLI）二选一：
 
-**① 自动下载【`0.2.0` 起，`bdl-lsp` 已可用】** —— 四级本地查找全部落空时，扩展按平台从 GitHub Release
+**① 自动下载【`0.2.0` 起可用：`bdl-lsp` 与 `tiptop` 都是】** —— 四级本地查找全部落空时，扩展按平台从 GitHub Release
 下载、解包到扩展目录、设置可执行位，并清掉同前缀的旧版本目录：
 
 | 平台 | 资产 |
@@ -69,7 +69,7 @@ Zed 命令面板 → zed: install dev extension → 选择本仓库目录
 - **本地已有二进制时不会下载**（用户装的优先；下载只作第 5 级兜底）。
 - 状态显示在 Zed 的语言服务器状态里（检查更新 / 下载中 / 失败原因 + 可操作提示）。
 - 关闭：`lsp.bdl-lsp.settings.ext.download.bdlLsp = "off"`（键缺省即 `auto`）。
-- `tiptop` 的自动下载（`ext.download.tiptop`）**代码已就绪，但需要 tiptop 先有 Release**（PLAN Z-P3-4）。
+- `tiptop` 的资产命名一致（`tiptop-linux-amd64.tar.gz` / `tiptop-darwin-arm64.tar.gz` / `tiptop-windows-amd64.zip`，附 `SHA256SUMS`；v0.1.10 起）。
 - 首次使用会用到 `download_file` capability；若你收紧了 `granted_extension_capabilities`，
   需要放行 `host = "github.com"`、`path = ["darcyjoven", "**"]`。
 
