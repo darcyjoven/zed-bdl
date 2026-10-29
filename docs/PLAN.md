@@ -515,11 +515,11 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | 10b | **task 没被变量过滤** | `task: spawn` 列表里能看到全部 21 条 `4gl:` task（**尤其 6 条 exec**：它们的 `-command` 里含 Zed 变量，写错会被过滤掉）；已存在的 `settings.json` 不被覆盖（写 `.bdl-new`） | P1 |
 | 10c | capability | 首次使用 slash command 触发 `process:exec` 时，Zed **不会**报 "capability ... was not listed in the extension manifest"；若用户收紧了 `granted_extension_capabilities`，按文档放行同形状 | P1 |
 | 11 | **Code Lens ①** | 开 `code_lens: "on"`：MAIN 那行出现链内子文件 lens，**同一 range 的多条各占一行** | P3（服务端已实现） |
-| 12 | **Code Lens ②** | 点击 lens 的 command 能执行并打开目标文件 | P2（先验证） |
-| 13 | Code Lens ③ | 链内文件数 > 上限时显示前 N 条 + 「…共 M 个」 | P3 |
-| 14 | 函数级反查 | 函数定义处可看「被 N 处调用」并跳转 | P3 |
+| 12 | **Code Lens ②** | 点击 lens → `bdl.openLink` → 服务端反向 `window/showDocument` 打开目标文件。**若点击无反应**：从 `lsp command selector` 手动跑 `bdl.openLink`（会给出明确错误），或改用 `/bdl-link-chain` | P3（已实现，待实机） |
+| 13 | Code Lens ③ | 链内文件数 > `link.lensMax`（默认 10）时只显示前 N 条 + 一条**纯文本**汇总（点了无反应是预期的）；把 `Settings.ext` 之外的 `link.lensMax` 调小可复现 | P3（已实现） |
+| 14 | 函数级反查 | **未实现**：Code Lens 目前只列链接（链内子文件），不做"被 N 处调用"；候选数据（`wsindex.CallsOf`）已有，等明确需求再排（§7 Z-P3-3 备注） | 未排期 |
 | 15 | 设置热更新 | 改 `settings`（例如 `diagnostics` 级别）后**无需重启**即生效；`zed: open log` 里应出现 bdl-lsp 的 `配置已更新` | P3（已由源码解释，实机顺手确认） |
-| 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功；删缓存可重下；失败有提示 | P4 |
+| 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功（应拿到 **bdl-lsp v0.3.15** / tiptop v0.1.10）；**删掉扩展目录里的 `bdl-lsp-*` 缓存目录**再打开 `.4gl` 应重下；离线时应复用缓存而不是报错；失败有可操作提示 | P4（已实现） |
 | 17 | 路径含空格与中文 | 诊断/跳转/下载/上传均正常（Windows 尤其） | P1/P4 |
 | 18 | ABI 15 ↔ Zed tree-sitter 运行时 | 高亮/outline 正常（若异常，是 grammar 兼容问题，需换 rev） | P0 |
 | 19 | **项目符号搜索** | `project symbols: toggle` 能搜到 BDL 函数（`bdl-lsp ≥ 0.3.15` 已声明 `workspaceSymbolProvider`；0.3.15 之前预期搜不到） | P3（Z-P3-6 已修，待实机） |
