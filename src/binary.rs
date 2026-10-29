@@ -40,6 +40,43 @@ pub fn resolve_lsp(
     server_id: Option<&zed::LanguageServerId>,
 ) -> zed::Result<zed::Command> {
     let name = exe_name(LSP);
+    let command = |path: String| zed::Command {
+        command: path,
+        args: lsp_args(settings),
+        env: settings.env.clone(),
+    };
+
+    // 1–4：本地四级查找。显式配置写了却不存在 → 直接报错，不静默回退。
+    if let Some(path) = lookup_lsp_path(worktree, settings)? {
+        return Ok(command(path));
+    }
+
+    // 5. 兜底：运行时下载（无感；用户已装好的二进制永远优先）
+    match crate::download::ensure_lsp(settings, server_id) {
+        Ok(path) => Ok(command(path)),
+        Err(download_err) => Err(format!(
+            "找不到 {name}。\n\
+             \n\
+             已尝试的方式：Zed 设置 lsp.bdl-lsp.binary.path → 环境变量 BDL_LSP_PATH → \
+             <工作区>/.bdl-lsp/bin/{name} → PATH → 自动下载。\n\
+             \n\
+             自动下载的结果：{download_err}\n\
+             \n\
+             手工准备（任选一种）：\n\
+             1. 设置 lsp.bdl-lsp.binary.path 为绝对路径；\n\
+             2. 设置环境变量 BDL_LSP_PATH；\n\
+             3. 把二进制放到 <工作区>/.bdl-lsp/bin/{name}；\n\
+             4. 把二进制所在目录加入 PATH。\n\
+             \n\
+             构建方法（在 bdl-lsp 仓库）：\n\
+             make build            # Linux / macOS\n\
+             scripts\\build.ps1     # Windows"
+        )),
+    }
+}
+
+/// 语言服务器的启动参数：`--log-level <级别>`（非 info 时），用户显式给的参数优先。
+fn lsp_args(settings: &Settings) -> Vec<String> {
     let mut args = settings.arguments.clone();
     if !args.iter().any(|a| a == "--log-level" || a == "-log-level") {
         if let Some(level) = settings.log_level() {
@@ -47,7 +84,16 @@ pub fn resolve_lsp(
             args.push(level);
         }
     }
-    let env = settings.env.clone();
+    args
+}
+
+/// **只做本地四级查找，不触发下载**（`/bdl-env-check` 这类诊断命令用它：
+/// 诊断不该顺手下载 9 MB）。
+///
+/// 顺序：显式设置 → 环境变量 → 工作区 `.bdl-lsp/bin/` → `PATH`。
+/// 返回 `Ok(None)` = 本地都没有；`Err` = 用户显式配了路径但文件不存在。
+pub fn lookup_lsp_path(worktree: &zed::Worktree, settings: &Settings) -> zed::Result<Option<String>> {
+    let name = exe_name(LSP);
 
     // 1. 显式设置优先
     if let Some(path) = settings.path.as_ref() {
@@ -58,76 +104,29 @@ pub fn resolve_lsp(
                  请检查该设置（支持 ~/ 展开），或清空它改用其它方式。"
             ));
         }
-        return Ok(zed::Command {
-            command: expanded,
-            args,
-            env,
-        });
+        return Ok(Some(expanded));
     }
 
     // 2. 环境变量
     if let Some(path) = non_empty_env("BDL_LSP_PATH") {
         let expanded = expand_home(&path);
         if !PathBuf::from(&expanded).is_file() {
-            return Err(format!(
-                "环境变量 BDL_LSP_PATH 指向的文件不存在：{path}"
-            ));
+            return Err(format!("环境变量 BDL_LSP_PATH 指向的文件不存在：{path}"));
         }
-        return Ok(zed::Command {
-            command: expanded,
-            args,
-            env,
-        });
+        return Ok(Some(expanded));
     }
 
     // 3. 工作区 `.bdl-lsp/bin/`
     if let Some(path) = workspace_binary(worktree, &name) {
-        return Ok(zed::Command {
-            command: path,
-            args,
-            env,
-        });
+        return Ok(Some(path));
     }
 
     // 4. PATH
     if let Some(path) = worktree.which(&name) {
-        return Ok(zed::Command {
-            command: path,
-            args,
-            env,
-        });
+        return Ok(Some(path));
     }
 
-    // 5. 兜底：运行时下载（无感；用户已装好的二进制永远优先）
-    match crate::download::ensure_lsp(settings, server_id) {
-        Ok(path) => {
-            return Ok(zed::Command {
-                command: path,
-                args,
-                env,
-            })
-        }
-        Err(download_err) => {
-            return Err(format!(
-                "找不到 {name}。\n\
-                 \n\
-                 已尝试的方式：Zed 设置 lsp.bdl-lsp.binary.path → 环境变量 BDL_LSP_PATH → \
-                 <工作区>/.bdl-lsp/bin/{name} → PATH → 自动下载。\n\
-                 \n\
-                 自动下载的结果：{download_err}\n\
-                 \n\
-                 手工准备（任选一种）：\n\
-                 1. 设置 lsp.bdl-lsp.binary.path 为绝对路径；\n\
-                 2. 设置环境变量 BDL_LSP_PATH；\n\
-                 3. 把二进制放到 <工作区>/.bdl-lsp/bin/{name}；\n\
-                 4. 把二进制所在目录加入 PATH。\n\
-                 \n\
-                 构建方法（在 bdl-lsp 仓库）：\n\
-                 make build            # Linux / macOS\n\
-                 scripts\\build.ps1     # Windows"
-            ));
-        }
-    }
+    Ok(None)
 }
 
 /// 解析 `tiptop` 可执行文件路径（供 slash command / task 生成脚本使用）。
@@ -136,30 +135,7 @@ pub fn resolve_lsp(
 pub fn resolve_tools(worktree: &zed::Worktree, settings: &Settings) -> zed::Result<String> {
     let name = exe_name(TOOLS);
 
-    if let Some(path) = settings.ext_str(&["tools", "path"]) {
-        let expanded = expand_home(&path);
-        if !PathBuf::from(&expanded).is_file() {
-            return Err(format!(
-                "tiptop 的路径来自 Zed 设置 lsp.bdl-lsp.settings.ext.tools.path，\
-                 但文件不存在：{path}\n请检查该设置（支持 ~/ 展开），或清空它改用其它方式。"
-            ));
-        }
-        return Ok(expanded);
-    }
-
-    if let Some(path) = non_empty_env("TIPTOP_PATH") {
-        let expanded = expand_home(&path);
-        if !PathBuf::from(&expanded).is_file() {
-            return Err(format!("环境变量 TIPTOP_PATH 指向的文件不存在：{path}"));
-        }
-        return Ok(expanded);
-    }
-
-    if let Some(path) = workspace_binary(worktree, &name) {
-        return Ok(path);
-    }
-
-    if let Some(path) = worktree.which(&name) {
+    if let Some(path) = lookup_tools_path(worktree, settings)? {
         return Ok(path);
     }
 
@@ -184,6 +160,40 @@ pub fn resolve_tools(worktree: &zed::Worktree, settings: &Settings) -> zed::Resu
              scripts\\build.ps1     # Windows"
         )),
     }
+}
+
+/// **只做本地四级查找，不触发下载**（`/bdl-env-check` 用）。
+pub fn lookup_tools_path(worktree: &zed::Worktree, settings: &Settings) -> zed::Result<Option<String>> {
+    let name = exe_name(TOOLS);
+
+    if let Some(path) = settings.ext_str(&["tools", "path"]) {
+        let expanded = expand_home(&path);
+        if !PathBuf::from(&expanded).is_file() {
+            return Err(format!(
+                "tiptop 的路径来自 Zed 设置 lsp.bdl-lsp.settings.ext.tools.path，\
+                 但文件不存在：{path}\n请检查该设置（支持 ~/ 展开），或清空它改用其它方式。"
+            ));
+        }
+        return Ok(Some(expanded));
+    }
+
+    if let Some(path) = non_empty_env("TIPTOP_PATH") {
+        let expanded = expand_home(&path);
+        if !PathBuf::from(&expanded).is_file() {
+            return Err(format!("环境变量 TIPTOP_PATH 指向的文件不存在：{path}"));
+        }
+        return Ok(Some(expanded));
+    }
+
+    if let Some(path) = workspace_binary(worktree, &name) {
+        return Ok(Some(path));
+    }
+
+    if let Some(path) = worktree.which(&name) {
+        return Ok(Some(path));
+    }
+
+    Ok(None)
 }
 
 /// 读一个非空环境变量。

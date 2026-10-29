@@ -1052,7 +1052,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 | 名称 | 参数 | 做什么 | 阶段 |
 |---|---|---|---|
-| `/bdl-env-check` | 无 | 显示生效设置摘要（链接/字段 mode、dataDir、Genero 版本、日志级别）、两个二进制的路径与版本（实跑 `version`）、资料文件是否存在，并打印生效配置原文；**版本低于最低要求（`bdl-lsp ≥ 0.3.13`、`tiptop ≥ 0.1.10`）时给一句升级提醒** | ✅ 0.2.0 |
+| `/bdl-env-check` | 无 | 显示生效设置摘要（链接/字段 mode、dataDir、Genero 版本、日志级别）、两个二进制的路径与版本（实跑 `version`）、资料文件是否存在，并打印生效配置原文；**版本低于最低要求（`bdl-lsp ≥ 0.3.13`、`tiptop ≥ 0.1.10`）时给一句升级提醒**。二进制**只看本地、不会顺手下载**（没有就提示「会自动下载」），避免诊断命令悄悄拉 9 MB | ✅ 0.2.0 |
 | `/bdl-link-status` | 无 | 读 `.project/link/links.meta.json` + `links.jsonl`，显示链 / orphan / ambiguous / 缺失文件 / 生成时间 / 来源 / 局部更新 / 链内文件数；**没有资料时给的是引导文案，不是报错** | ✅ 0.2.0 |
 | `/bdl-link-chain` | 程序代码 | 读 `links.jsonl`，列出该程序所在的链（MAIN / 模组 / 程序号）与链内文件（最多 30 个，超出折叠）；这是 **Code Lens 落地前的替代视图**，并会说明「链接关系 ≠ 调用关系」 | ✅ 0.2.0 |
 | `/bdl-schema-status` | 无 | 读 `.project/schema/tables.json`，显示表数 / 列数 / 导入时间 / 来源 / 原始行数 | ✅ 0.2.0 |

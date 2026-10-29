@@ -139,26 +139,37 @@ fn env_check(worktree: &zed::Worktree, settings: &config::Settings) -> String {
     );
 
     // 二进制：路径 + 版本（版本用只读子命令实跑）
+    // 诊断命令**只看本地**：不触发下载（否则查个环境就顺手下 9 MB）。
     let mut warnings = Vec::new();
-    match binary::resolve_tools(worktree, settings) {
-        Ok(path) => {
+    match binary::lookup_tools_path(worktree, settings) {
+        Ok(Some(path)) => {
             let version = cli_text(&path, &["version"]);
             push(&mut out, "tiptop", &format!("{path}  [{version}]"));
             if let Some(warn) = version_warning("tiptop", &version, MIN_TIPTOP) {
                 warnings.push(warn);
             }
         }
-        Err(err) => push(&mut out, "tiptop", &format!("找不到：{err}")),
+        Ok(None) => push(
+            &mut out,
+            "tiptop",
+            "本地没有（首次使用/下次启动会自动下载；也可设置 ext.tools.path）",
+        ),
+        Err(err) => push(&mut out, "tiptop", &format!("配置有问题：{err}")),
     }
-    match binary::resolve_lsp(worktree, settings, None) {
-        Ok(cmd) => {
-            let version = cli_text(&cmd.command, &["version"]);
-            push(&mut out, "bdl-lsp", &format!("{}  [{version}]", cmd.command));
+    match binary::lookup_lsp_path(worktree, settings) {
+        Ok(Some(path)) => {
+            let version = cli_text(&path, &["version"]);
+            push(&mut out, "bdl-lsp", &format!("{path}  [{version}]"));
             if let Some(warn) = version_warning("bdl-lsp", &version, MIN_BDL_LSP) {
                 warnings.push(warn);
             }
         }
-        Err(err) => push(&mut out, "bdl-lsp", &format!("找不到：{err}")),
+        Ok(None) => push(
+            &mut out,
+            "bdl-lsp",
+            "本地没有（打开 .4gl 时会自动下载；也可设置 lsp.bdl-lsp.binary.path）",
+        ),
+        Err(err) => push(&mut out, "bdl-lsp", &format!("配置有问题：{err}")),
     }
 
     // Z-P4-4：版本兼容提示（只在低于最低要求时提醒，不做硬拦）。
