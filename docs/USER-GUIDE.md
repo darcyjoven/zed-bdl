@@ -894,7 +894,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | `globals.searchPaths` / `perRoots` | string[] | `[]` | GLOBALS 附加解析根（相对工作区根）；`.per` 附加查找根 |
 | `diagnostics` | object | `{}` | **逐诊断码调级的唯一入口**；未列出的用默认级别 |
 | `builtins.enable` / `paths` / `disable` | bool / string[] / string[] | `true` / `[]` / `[]` | 内置符号表总开关、附加符号 JSON、屏蔽名单 |
-| `link.mode` / `dataDir` / `moduleRoots` / `globalModules` | string/string/string[]/string[] | `off` / `.project/link` / `[]` / `["sub","lib","qry"]` | 链接资料三态（`off \| file \| db`，**默认 off**）、目录、模组根、全局可见扁平模组 |
+| `link.mode` / `dataDir` / `moduleRoots` / `globalModules` / `lensMax` | string/…/int | `off` / `.project/link` / `[]` / `["sub","lib","qry"]` / `10` | 链接资料三态（`off \| file \| db`，**默认 off**）、目录、模组根、全局可见扁平模组；**Code Lens 条数上限**（挂 MAIN 头上的子文件 lens，见 §3.2） |
 | `schema.mode` / `dataDir` | string | `"off"` / `".project/schema"` | 字段资料三态（**默认 off**）与目录（旧 `.project/.schema` 只读兼容） |
 | `index.enable` | bool | `true` | 后台工作区符号索引 |
 | `ignore.files` / `fields` / `forms` | string[] | `[]` | 忽略列表（支持 `**`） |

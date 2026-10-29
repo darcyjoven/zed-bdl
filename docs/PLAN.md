@@ -233,7 +233,7 @@ zed.dev 官方语义：
 
 用户在 `.zed/settings.json` 只写一处 `lsp.bdl-lsp.settings`：
 
-- **发往 `bdl-lsp` 的键（无 `bdl.` 前缀）**：`generoVersion`、`logLevel`、`globals`、`perRoots`、`diagnostics`、`builtins`、`link{mode,dataDir,moduleRoots,globalModules}`、`schema{mode,dataDir}`、`index`、`ignore`、`format`、`limits`。
+- **发往 `bdl-lsp` 的键（无 `bdl.` 前缀）**：`generoVersion`、`logLevel`、`globals`、`perRoots`、`diagnostics`、`builtins`、`link{mode,dataDir,moduleRoots,globalModules,lensMax}`、`schema{mode,dataDir}`、`index`、`ignore`、`format`、`limits`。
 - **仅 Zed 扩展自用（不下发）**：`ext.tools.path`、`ext.schema.{batchSize,timeoutSec}`、`ext.prod.oracle.*`、`ext.prod.deploy.*`、`ext.deploy.enable`、`ext.build.{enable,4gl.*,per.*}`、`ext.download.{bdlLsp,tiptop}`。
   语言服务器日志级别统一用下发的 `logLevel`（`logLevel != "info"` 时扩展同时把它作为 `serve --log-level <级别>` 参数，与 VSCode 侧一致）。
 - 兼容路径：`lsp.bdl-lsp.initialization_options` 仍可用（优先级最高，作为逃生口）；`binary.path` / `binary.arguments` / `binary.env` 沿用 Zed 原生。
