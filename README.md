@@ -1,257 +1,308 @@
-# BDL for Zed
+# Genero BDL for Zed（`4gl-full`）
 
-Genero BDL（`.4gl` / `.global`）与 Form（`.per`）的 Zed 扩展：语法高亮、outline、
-括号匹配、缩进，以及通过 [`bdl-lsp`](https://github.com/darcyjoven/bdl-lsp) 提供的
-跳转 / 引用 / 悬停 / 诊断。
+Genero BDL（`.4gl` / `.global`）与 Form（`.per`）的 Zed 扩展：Tree-sitter 语法高亮、
+outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://github.com/darcyjoven/bdl-lsp)
+提供的诊断 / 悬停 / 跳转 / 引用 / 补全 / 重命名 / Code Action / 格式化 / 语义高亮；
+资料采集、字段资料、上传、下载、编译、链接、预览由 [`tiptop`](https://github.com/darcyjoven/tiptop)
+在 task 终端里完成。
 
-> 扩展 id 为 **`4gl-full`**，与轻量扩展 [`bdl`](https://github.com/darcyjoven/bdl-plugin)
-> （只有 grammar、没有 LSP）共存，两者可以同时安装。
-> 完整操作手册：[docs/USER-GUIDE.md](docs/USER-GUIDE.md)（含截图/录屏占位与设置总表）。
-> 本仓库只放 Zed 交付物；计划、测试脚本、过程记录统一在本地 `bdl-lsp` 仓库。
-> v1 验证平台：**Linux + Windows**（macOS 后续补齐）。
+> - 扩展 id 为 **`4gl-full`**，与轻量扩展 [`bdl`](https://github.com/darcyjoven/bdl-plugin)（只有 grammar）**可以同时安装**。
+> - 完整操作手册：[docs/USER-GUIDE.md](docs/USER-GUIDE.md)。
+> - 追平计划与待办（唯一来源）：[docs/PLAN.md](docs/PLAN.md)。
+> - 本仓库只放 Zed 交付物；构建缓存、日志、语料等过程产物在本地 `bdl-lsp/artifacts/`。
+> - v1 验证平台：**Linux + Windows**（macOS 后续补齐）。
 
-## 能力
+**版本**：扩展 `0.1.1` → 目标 `0.2.0`（追平中，阶段见 [PLAN §7](docs/PLAN.md)）。
+后端：`bdl-lsp` **v0.3.14**（已有四平台 Release）· `tiptop` **0.1.10**（源码）。
 
-| 能力 | 说明 |
-|---|---|
-| 语法高亮 | 由 grammar 关键字表驱动，BDL 300 个关键字 / `.per` 76 个，全部覆盖 |
-| Outline | BDL：函数、报表、MAIN、标签、常量、TYPE、模块级 DEFINE；`.per`：item、SCREEN RECORD、表、菜单、动作 |
-| 括号匹配 | `(` `)` / `[` `]` / `{` `}` |
-| 缩进 | BDL 按块结构（`IF`/`WHILE`/`FOR`/`FUNCTION`…）；`.per` **不动 LAYOUT** |
-| SQL 注入 | `.4gl` 里 `SELECT`/`INSERT`/`UPDATE`/`DELETE` 的 `sql_body` 按 SQL 高亮 |
-| LSP | 跳转、引用、悬停、文档/工作区符号、语法诊断、字段校验（依赖 `bdl-lsp`） |
-| 格式化 | `.4gl` 关键字大小写 + 缩进（可配）；**`.per` 一律不格式化** |
-| 部署 | 通过 `task: spawn` 调 `bdl-lsp deploy` 上传并远程编译（Zed 扩展 API 不支持任意命令） |
-| LSP 能力 | 补全、重命名、Code Action、语义 token（Zed 是否使用语义 token 见下方说明） |
+---
 
-## 前置：准备 `bdl-lsp`
+## 1. 能力一览
 
-扩展**不下载**二进制（自动下载暂不排期），需要你自己构建一次：
+| 能力 | 触发方式 | 状态 |
+|---|---|---|
+| 语法高亮 | 打开 `.4gl` / `.global` / `.per` | ✅ 300 / 76 个关键字全部覆盖 |
+| Outline | 大纲面板 | ✅ 函数 / REPORT / MAIN / TYPE / item / SCREEN RECORD … |
+| 括号匹配、缩进 | 编辑时 | ✅ `.per` 的 LAYOUT **绝不缩进** |
+| SQL 注入 | `.4gl` 里 `SELECT`/`INSERT`/`UPDATE`/`DELETE` | ✅ 按 SQL 高亮 |
+| 诊断 | 编辑时（Problems） | ✅ 14 个静态码 + 动态 `missing-<kind>` |
+| 悬停 / 跳转 / 引用 / 补全 / 重命名 / Code Action / 格式化 | Zed 原生命令 | ✅ 由 `bdl-lsp` 提供；重命名只改当前文件，`.per` 不格式化 |
+| 语义高亮 | `"semantic_tokens": "combined"` | 🔧 计划中（`0.2.0`，需加扩展级规则文件） |
+| 设置生效与轻量档默认 | 自动 | 🔧 计划中（`0.2.0`）：今天 `lsp.bdl-lsp.settings` 不会到达服务端，且不写设置等于"开资料功能" |
+| 链接资料采集 / 导入 / 更新 | task → `tiptop link …` | ✅ 可用 |
+| 链接关系就地查看（每条子文件可点） | Code Lens 挂在 **MAIN 函数头** | 🔧 计划中（需 `bdl-lsp` 实现 `textDocument/codeLens`） |
+| 字段资料采集 / 同步 | task → `tiptop schema …` | ✅ 可用 |
+| 表 / 列清单（无侧边栏树） | slash command 文本列表 | 🔧 计划中 |
+| 上传 / 下载 / 预演上传（单文件） | task → `tiptop upload` / `download` | ✅ 可用 |
+| 编译 / 链接 / 预览（生产端执行） | task → `tiptop exec` | ✅ 可用 |
+| 整包部署 | task → `tiptop deploy -dry-run / -list` | ✅ 可用（CLI） |
+| 只读查询（资料状态、部署目标、环境自检） | slash command | 🔧 计划中 |
+| 二进制自动下载 | 首次打开时 | 🔧 计划中（`bdl-lsp` 已有 Release；`tiptop` 需先建 Release） |
+| 编辑器标题栏按钮 / 状态栏 / 侧边栏树 / 输出面板 / Problems 注入 | — | ❌ Zed 无对应 API（永久差异，见 §6） |
+
+---
+
+## 2. 安装
+
+### 2.1 安装扩展
+
+```text
+Zed 命令面板 → zed: install dev extension → 选择本仓库目录
+```
+
+（扩展注册表发布未排期。）
+
+### 2.2 准备两个二进制
+
+`bdl-lsp`（语言服务器）与 `tiptop`（资料/部署 CLI）二选一：
+
+**① 自动下载（计划中，`0.2.0` 以后）** —— 打开 `.4gl` 时按平台下载到扩展目录，无需手工操作。
+
+**② 手工构建（当前可行）**
 
 ```bash
-# Linux
-cd bdl-lsp
-source scripts/dev-env.sh      # 沙箱/无 root 环境才需要
-make build                     # 产物：artifacts/bin/bdl-lsp
+# Linux / macOS
+cd bdl-lsp && make build            # 产物 artifacts/bin/bdl-lsp
+cd tiptop && make build             # 产物 artifacts/bin/tiptop
 ```
 
 ```powershell
-# Windows（无需 make）
-cd bdl-lsp
-powershell -ExecutionPolicy Bypass -File scripts\build.ps1
-# 产物：artifacts\bin\bdl-lsp.exe
+# Windows（无 make）
+cd bdl-lsp; powershell -File scripts\build.ps1
+cd tiptop;  powershell -File scripts\build.ps1
 ```
 
-然后任选一种方式让 Zed 找到它（按优先级）：
+**③ 指定已有二进制**（见 §3 的 `binary.path`），或把二进制放进 `PATH`、
+或放在工作区的 `.bdl-lsp/bin/` 下。
 
-| 优先级 | 方式 | 配置 |
-|---|---|---|
-| 1 | Zed 设置 | `lsp.bdl-lsp.binary.path` 指向绝对路径 |
-| 2 | 环境变量 | `BDL_LSP_PATH=/path/to/bdl-lsp` |
-| 3 | 工作区内 | 放在 `<工作区>/.bdl-lsp/bin/bdl-lsp`（Windows 为 `bdl-lsp.exe`） |
-| 4 | PATH | 把二进制所在目录加入 `PATH` |
+> 二进制查找顺序（`bdl-lsp` 与 `tiptop` 同一套语义）：
+> Zed 设置路径 → 环境变量 `BDL_LSP_PATH` / `TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/` → `PATH`。
 
-Zed 设置示例（`~/.config/zed/settings.json`）：
+---
 
-```json
+## 3. 配置（`.zed/settings.json`）
+
+**只需写一处** `lsp.bdl-lsp.settings`：与 `bdl-lsp` 同名的键会下发给语言服务器，
+仅本扩展使用的键收在 `ext` 下。
+
+```jsonc
 {
   "lsp": {
     "bdl-lsp": {
-      "binary": {
-        "path": "/home/you/bdl-lsp/artifacts/bin/bdl-lsp",
-        "args": ["--log-level", "debug"]
-      },
+      "binary": { "path": "", "arguments": [], "env": {} },
       "settings": {
+        // —— 下发给 bdl-lsp（无 bdl. 前缀）——
         "generoVersion": "2.50",
-        "diagnostics": {
-          "record-member-unknown": "off"
-        },
-        "globals": {
-          "searchPaths": []
-        },
-        "format": {
-          "keywords": "upper",
-          "indentStyle": "space",
-          "indentSize": 4
-        },
-        "ignore": {
-          "files": ["build/**", "**/*.bak.4gl"],
-          "fields": ["tmp_*"],
-          "forms": ["**/per/old.per"]
-        },
-        "link": {
-          "enable": true,
-          "dataDir": ".link",
-          "moduleRoots": [],
-          "globalModules": ["sub", "lib", "qry"],
-          "maxAgeDays": 7
+        "logLevel": "info",
+        "link": { "mode": "off", "dataDir": ".project/link", "moduleRoots": [], "globalModules": ["sub", "lib", "qry"] },
+        "schema": { "mode": "off", "dataDir": ".project/schema" },
+        "diagnostics": { "record-member-unknown": "warning" },
+        "format": { "keywords": "unchanged", "indentStyle": "auto", "indentSize": 0 },
+        "ignore": { "files": [], "fields": [], "forms": [] },
+        "perRoots": [],
+        "limits": { "maxFileBytes": 2097152, "maxFileLines": 20000, "maxIssues": 200, "parseTimeoutMs": 2000 },
+
+        // —— 仅 Zed 扩展使用（不下发给 LSP）——
+        "ext": {
+          "tools": { "path": "" },
+          "schema": { "batchSize": 200, "timeoutSec": 120 },
+          "prod": {
+            "oracle": { "host": "", "port": 1521, "service": "", "user": "" },
+            "deploy": { "host": "", "port": 22, "user": "", "region": "1", "strictHostKey": true, "transport": "off", "localRoot": ".", "remoteRoot": "" }
+          },
+          "deploy": { "enable": false },
+          "build": {
+            "enable": false,
+            "4gl": { "preview": "cd ${path} && r.c2 ${name}", "compile": "cd ${path} && r.c2 ${name}", "link": "r.l2 ${name}" },
+            "per": { "preview": "cd ${path} && fglform -M -W all ${fullname} && rm ${name}.42f", "form": "cd ${path} && r.gf ${name} 2 p" }
+          },
+          "download": { "bdlLsp": "auto" }
         }
       }
     }
+  },
+  "languages": {
+    "Genero BDL": { "semantic_tokens": "combined" },
+    "Genero Form": { "semantic_tokens": "combined" }
   }
 }
 ```
 
-`settings` 会作为 `workspace/didChangeConfiguration` 的内容下发给服务器，
-字段与 VSCode 扩展的 `bdl.*` 一致。
+要点：
 
-`link.*` 是程序链接资料（P7-D）的配置。资料本身由 CLI 生成，Zed 侧只读。
+- `link.mode` / `schema.mode` 三态 `off | file | db`，**默认 `off`（轻量档：不连库、不写工作区）**；导入 CSV 后设 `file`，直连 Oracle 设 `db`。
+- `diagnostics` 是逐诊断码调级的**唯一入口**（`off | error | warning | information | hint`）。
+- `ext.build.*.command` 里的占位符与 VSCode 一致，分隔符恒为 `/`：`${path}`（两层，如 `axc/4gl`）、`${fullpath}`（三层）、`${name}`（去扩展名）、`${fullname}`（含扩展名）。
+- 完整键表与示例见 [USER-GUIDE §8](docs/USER-GUIDE.md)。
 
-`ignore.*` 是诊断忽略列表（P8）：`files` 命中后整文件静默并排除出工作区索引，
-`fields` 只屏蔽 `field-not-in-form`，`forms` 屏蔽该表单的字段类诊断。
-改完 `ignore.files` 后建议 `editor: restart language server`，让索引重建时应用排除。
+> ⚠️ **当前版本（0.1.1）的已知问题**：`settings` 里的键不会到达 `bdl-lsp`（服务端不发
+> `workspace/configuration`），且不写 `link/schema` 时服务端按"启用"兜底。
+> 这两点由 [PLAN Z-P0-3](docs/PLAN.md) 修复；在此之前请用
+> `lsp.bdl-lsp.initialization_options` 下发同样的内容（优先级最高）。
 
-> **UI 限制（P7-E）**：VSCode 有一个「链接资料」TreeView（点击可跨文件跳转），
-> Zed 没有等价的视图 API，也**不会**把链路塞进大纲——`documentSymbol` 是
-> VSCode 大纲的数据源，塞进去会让 VSCode 里多出不可跳转的假符号。
-> 在 Zed 里查看链接关系请用 `bdl-lsp link status` 或 `cmd/link-audit`。
+---
 
-```bash
-bdl-lsp link import -csv gal_file.csv -root /path/to/project
-# 或者让 CLI 直接去取（P7-D-3），跑完 Zed 侧自动重载：
-BDL_ORA_PASSWORD=... bdl-lsp link sync -source golang -host dbhost -service PROD -user readonly
-```
+## 4. 命令入口：task 与 slash command
 
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `enable` | `true` | 关掉后 `function-not-found` 与 `link-data-*` 都不生效 |
-| `dataDir` | `.link` | 资料目录（相对项目根） |
-| `moduleRoots` | `[]` | 模组根；空 = 自动探测 `tiptop` / `topcust` |
-| `globalModules` | `["sub","lib","qry"]` | 对所有程序可见的模组（扁平规则） |
-| `maxAgeDays` | `7` | 资料过期提示阈值（只在资料文件上给 hint） |
-| `sync.*` | 全关 | 采集（P7-D-3）：`enable` / `source`(golang/command/file) / `interval` / `onStart` / `db.*` / `command` / `file`。**Zed 侧照发配置即可**，密码走环境变量 `BDL_ORA_PASSWORD` 或 `.link/secrets.json` |
+Zed 扩展**无法注册命令到命令面板**，所以：
 
-`diagnostics` 是**唯一**的诊断级别入口：键为诊断码，值为
-`off`/`error`/`warning`/`information`/`hint`。旧专用键已删除。完整码表见
-[使用手册第 4 节](docs/USER-GUIDE.md#4-诊断与检查)。
+- **写盘 / 长任务 / 需要交互输入**的操作用 **task**（终端流式输出、可取消）；
+- **只读查询**用 **slash command**（Agent 面板）。
 
-`globals.*` 是 GLOBALS 模组全局变量相关的配置（P3a）：
+### 4.1 task 示例（`.zed/tasks.json`）
 
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `searchPaths` | `[]` | 附加解析根（相对工作区根）；解决跨模块目录层级不一致的引用 |
-
-`perRoots` 是字段校验相关的配置（P3b）：
-
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `perRoots` | `[]` | `.per` 的附加查找根（相对工作区根）；表单路径先按 4gl 同级 `per/` 目录解析 |
-
-`format.*` 控制 `.4gl` 的格式化（P4）：
-
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `keywords` | `unchanged` | 关键字大小写：`unchanged` / `upper` / `lower` |
-| `indentStyle` | `auto` | 缩进字符：`auto`（跟随编辑器）/ `tab` / `space` |
-| `indentSize` | `0` | 每级缩进宽度；`0` 表示跟随编辑器的 `tab_size` |
-
-> **`.per` 表单文件不做任何格式化**（`textDocument/formatting` 直接返回空）。
-> 格式化只改关键字大小写与行首缩进，不动空白、标点与换行；文件含语法错误时整体跳过。
-
-Zed 侧的缩进跟随由设置项 `tab_size` 与 `hard_tabs` 决定——`auto` 模式下
-编辑器请求什么服务器就用什么。
-
-## 安装
-
-1. 安装 Rust 与 `wasm32-wasip2` target：
-
-   ```bash
-   rustup target add wasm32-wasip2
-   ```
-
-2. Zed 命令面板执行 `zed: install dev extension`，选择本目录。
-
-3. 打开一个 `.4gl` 或 `.per` 文件，检查状态栏是否显示语言为
-   **Genero BDL** / **Genero Form**，以及语言服务器是否启动。
-
-排查用 `zed: open log`；需要更详细的日志时从终端以 `zed --foreground` 启动。
-
-## 部署与远程编译
-
-Zed 的扩展 API 不能执行任意命令，所以部署走 **Zed task** 调 CLI，
-配置与 VSCode 共用 `.bdl-lsp/deploy.json`。
-
-最小 `.zed/tasks.json`：
-
-```json
+```jsonc
 [
   {
-    "label": "BDL: 部署预演",
-    "command": "bdl-lsp deploy -workspace \"$ZED_WORKTREE_ROOT\" -dry-run",
+    "label": "4gl: 链接资料：查看状态",
+    "command": "tiptop",
+    "args": ["link", "status", "-root", "$ZED_WORKTREE_ROOT"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
     "reveal": "always"
   },
   {
-    "label": "BDL: 部署当前文件",
-    "command": "bdl-lsp deploy -workspace \"$ZED_WORKTREE_ROOT\" \"$ZED_FILE\"",
-    "reveal": "always"
+    "label": "4gl: 链接资料：更新当前文件",
+    "command": "tiptop",
+    "args": ["link", "sync", "-root", "$ZED_WORKTREE_ROOT", "-source", "golang",
+             "-host", "10.0.0.10", "-port", "1521", "-service", "PROD", "-user", "APP",
+             "-files", "$ZED_RELATIVE_FILE"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "4gl: 上传当前文件",
+    "command": "tiptop",
+    "args": ["upload", "-workspace", "$ZED_WORKTREE_ROOT", "-file", "$ZED_RELATIVE_FILE"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "current"
+  },
+  {
+    "label": "4gl: 4GL 编译",
+    "command": "tiptop",
+    "args": ["exec", "-command", "cd axc/4gl && c2 $ZED_STEM", "-region", "1",
+             "-login-profile", "/u1/usr/profile/profile.topprod"],
+    "cwd": "$ZED_WORKTREE_ROOT"
   }
 ]
 ```
 
-运行：`Cmd/Ctrl + Shift + P` → `task: spawn` → 选 label。
+- `4gl: 初始化 Zed 工程` 任务（计划中）会在**终端里交互提问**主机/账号/区/模板，
+  生成 `.zed/{settings.json,tasks.json,bdl-tool.json}`——task 读不到 Zed 设置，所以凭证与模板
+  由生成脚本落文件。
+- 可用变量：`$ZED_FILE`、`$ZED_RELATIVE_FILE`、`$ZED_RELATIVE_DIR`、`$ZED_STEM`、
+  `$ZED_WORKTREE_ROOT`、`$ZED_LANGUAGE`、`${VAR:默认值}`。
+- 取消：task 设 `"use_new_terminal": false` + `"allow_concurrent_runs": true`，重跑即可取消上一次。
+- 快捷键绑定（`keymap.json`）：
 
-注意 task 用的是**登录 shell 的 PATH**，与 LSP 二进制的查找路径不同；
-需要把 `bdl-lsp` 放进 PATH 或在 task 里写绝对路径。完整说明（含配置项、
-退出码、常见问题）见本仓库的 [docs/USER-GUIDE.md](docs/USER-GUIDE.md) §7（Zed 侧暂停维护，命令名以 tiptop 为准）。
-
-## 与 VSCode 扩展的关系
-
-两者共享同一个 `bdl-lsp` 与同一套配置字段，区别只在客户端：
-
-| | VSCode（`vscode-bdl`） | Zed（本仓库） |
-|---|---|---|
-| 语言 id | `bdl` / `per` | `Genero BDL` / `Genero Form`（映射为 `bdl` / `per` 发给 LSP） |
-| 高亮来源 | TextMate 语法（脚本从 grammar 生成） | Tree-sitter query |
-| 配置位置 | `bdl.*` 设置项 | `lsp.bdl-lsp.settings` |
-
-## 开发
-
-```bash
-# 编译检查
-cargo check --target wasm32-wasip2
-
-# 发布构建（Zed 实际加载的是这个）
-cargo build --release --target wasm32-wasip2
-
-# 清单校验（extension.toml / languages/*/config.toml 一致性）
-python3 tests/verify-manifest.py
-
-# query 校验（节点名/字面量是否存在、能否编译、关键字覆盖率）
-# 需要两个 grammar 仓库与本仓库并列，且 tree-sitter CLI 在 PATH
-node tests/verify-queries.mjs
+```jsonc
+{ "context": "Workspace", "bindings": { "alt-u": ["task::Spawn", { "task_name": "4gl: 上传当前文件" }] } }
 ```
 
-`tests/verify-queries.mjs` 会检查：
+> 完整 task 总表见 [USER-GUIDE §8.4](docs/USER-GUIDE.md)。
 
-1. 每个 `.scm` 里的节点名都存在于 grammar 的 `src/node-types.json`；
-2. 每个字符串字面量都是真实 token（`#set!` 的值除外）；
-3. 用 `tree-sitter query` 对 `tests/fixtures/` 的样例真正编译一遍并统计命中数；
-4. grammar 的全部大写关键字是否都被 `highlights.scm` 覆盖。
+### 4.2 slash command（计划中）
 
-第 3 步能挡住"query 语法正确但规则写错、一条都匹配不上"这种最难查的情况。
+| 命令 | 参数 | 说明 |
+|---|---|---|
+| `/bdl-env-check` | — | 生效设置摘要、`bdl-lsp`/`tiptop` 版本与路径、资料状态 |
+| `/bdl-link-status` | — | 链数 / 文件数 / 生成时间 / 局部更新 |
+| `/bdl-schema-status` | — | 表数 / 列数 / 导入时间 / 来源 |
+| `/bdl-schema-tables` | 正则（可空） | 表清单（大小写不敏感过滤） |
+| `/bdl-schema-columns` | 表名 | 列清单（名称 / 说明 / 类型 / 长度） |
+| `/bdl-deploy-list` | — | `tiptop deploy -list` |
+| `/bdl-deploy-dry-run` | — | `tiptop deploy -dry-run -json`（只打印） |
+| `/bdl-force-parse` | — | 强制解析当前文件（需服务端 `executeCommand`） |
 
-### 修改 query 时的注意事项
+**会写盘的操作不进 slash command**，只给 task。
 
-- **节点名必须精确**。Zed 编译 query 时只要有一个未知节点名，**整份文件**
-  都会被丢弃，高亮全没，而界面上不会报错。
-- **字段绑定有类型约束**。`name: (name)` 这种写法在某些节点上会报
-  `Impossible pattern`（例如 `.per` 的 `menu_group`，其 `name` 字段实际是
-  `identifier | 关键字` 的联合）。改完务必跑一次校验脚本。
-- **LAYOUT 段不许缩进**。`.per` 的布局列位置有屏幕坐标语义，
-  `languages/per/indents.scm` 刻意不为 `(layout)` 声明 `@indent`。
+---
 
-## 已知限制
+## 5. 资料与部署速查
 
-- 扩展 API 不支持任意命令，部署/编译只能用 `.zed/tasks.json` 调用
-- **语义高亮**：服务器会发 LSP `semanticTokens`（只含用户自定义符号），
-  但 Zed 的着色走 tree-sitter `highlights.scm`，不消费 LSP semantic tokens。
-  Zed 侧的关键字/字符串/注释/数字高亮由 grammar 驱动，不受影响；
-  「用户定义的函数名显示为函数色」这一层在 Zed 里暂时看不到
-  `bdl-lsp deploy`（P5，尚未实现）。
-- 自动下载 `bdl-lsp` 暂不排期，二进制需要自备。
-- 未在 Zed 里实测（本机无图形界面）；已用 `cargo check/build --target wasm32-wasip2`
-  与 query 编译校验覆盖可自动化的部分。
+```bash
+# 链接资料（tiptop 写，bdl-lsp 只读）
+tiptop link import -csv DS.GAL_FILE.csv -root .
+tiptop link sync  -root . -source golang -host <主机> -service <服务名> -user <账号>
+tiptop link status -root .
 
-## 许可
+# 字段资料
+tiptop schema import -csv schema.csv -root .
+tiptop schema sync  -root . -source golang -host <主机> -service <服务名> -user <账号> \
+                    -batch-size 200 -timeout 120
+tiptop schema status -root .
 
-MIT，见 [LICENSE](LICENSE)。
+# 上传 / 下载 / 生产端执行
+tiptop upload   -workspace . -file aap/4gl/x.4gl
+tiptop download -workspace . -file aap/4gl/x.4gl
+tiptop exec     -command "cd axc/4gl && c2 x" -region 1
+
+# 整包部署（只打印计划 / 列出目标）
+tiptop deploy -dry-run
+tiptop deploy -list
+```
+
+- 资料目录：`<项目根>/.project/{link,schema,deploy}/`（旧 `.link/`、`.bdl-lsp/` 只读兼容）。
+- 数据库密码：环境变量 `BDL_ORA_PASSWORD`，或 `<项目根>/.project/secrets.json`
+  （`{"<用户名>":"<密码>"}`，Unix 必须 `chmod 600`）。
+- 进度：`tiptop` 把进度写 **stderr**（`进度\t阶段\t详情\ti\tn`），在 task 终端里直接可见。
+
+---
+
+## 6. Zed 与 VSCode 的差异（诚实说明）
+
+| 能力 | VSCode | Zed | 说明 |
+|---|---|---|---|
+| 语言智能 | ✅ | ✅ | 同一个 `bdl-lsp`，行为一致 |
+| 命令面板 | ✅ 33 条 | ⬇️ task + slash command | Zed 无命令注册 API |
+| 链接资料视图 | ✅ 侧边栏三级树 | ⬇️ Code Lens 挂 MAIN 函数头 | Zed 无树视图 API；每子文件一条、可点、上限 10 |
+| 字段资料视图 | ✅ 树 + 过滤 + 勾选 | ⬇️ slash 文本列表 | 过滤靠正则参数；批量同步用 task |
+| 进度条 / 取消 | ✅ 通知栏 | ⬇️ task 终端 + 重跑取消 | — |
+| 输出面板 | ✅ `4gl` / `4gl 任务` | ⬇️ task 终端 + `zed: open log` | — |
+| 编译错误进 Problems | ✅ | ❌ 永久差异 | 只看终端输出 |
+| 编辑器标题栏 / 右键按钮、状态栏 | ✅ | ❌ 永久差异 | 改用命令面板 + task + keymap |
+| 二进制分发 | ✅ VSIX 内置 | 🔧 运行时自动下载（计划中） | `bdl-lsp` 已有 Release，`tiptop` 待建 |
+| 反查引用 | ✅ 视图分页 | ⬇️ 函数级口径 | 数据来自 LSP 链接资料索引 |
+
+---
+
+## 7. 诊断
+
+14 个静态诊断码（`syntax-error`、`missing-node`、`file-too-large`、`parse-timeout`、
+`globals-file-not-found`、`variable-source-unresolved`、`field-not-in-form`、
+`form-duplicate-item`、`form-layout-tag-undefined`、`form-screen-record-undefined`、
+`function-not-found`、`link-data-invalid`、`link-data-legacy-dir`(hint)）、
+`record-member-unknown`(默认 off)，以及动态 `missing-<kind>`。
+
+权威表：`bdl-lsp/docs/DIAGNOSTICS.md`；Zed 侧调级示例与忽略列表见
+[USER-GUIDE §7](docs/USER-GUIDE.md)。
+
+---
+
+## 8. 开发与自检
+
+```bash
+cd zed-extension
+python3 tests/verify-manifest.py        # 清单校验（id / 版本 / grammar rev / 语言映射）
+export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
+export HOME=/code/workspace/bdl-lsp/artifacts/home
+node tests/verify-queries.mjs           # query 校验（节点名 / 关键字覆盖 / 真实语料编译）
+cargo build --release --target wasm32-wasip2
+```
+
+CI（`.github/workflows/build.yml`）：wasm 构建 + 魔数校验 + 清单校验 + grammar rev 存在性 + query 校验。
+
+---
+
+## 9. 文档
+
+| 文档 | 内容 |
+|---|---|
+| [docs/PLAN.md](docs/PLAN.md) | **Zed 侧唯一计划与待办**：基线、平台能力边界、差距矩阵、阶段任务、验收清单、风险 |
+| [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | 完整操作手册：安装、初始化、链接/字段资料、上传编译链接、设置总表、排错 |
+| [bdl-lsp/docs/FEATURES.md](https://github.com/darcyjoven/bdl-lsp/blob/main/docs/FEATURES.md) | 语言服务能力 |
+| [tiptop/docs](https://github.com/darcyjoven/tiptop) | 采集与部署 CLI |
+| [vscode-bdl/docs/TODO.md](https://github.com/darcyjoven/vscode-extension/blob/main/docs/TODO.md) | VSCode 侧待办（跨端目标） |
+
+## 许可证
+
+见 [LICENSE](LICENSE)。
