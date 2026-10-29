@@ -30,13 +30,13 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 | 语义高亮 | `"semantic_tokens": "combined"` | ✅ `0.2.0`：扩展自带 `semantic_token_rules.json`（8 条规则，带主题回退） |
 | 设置生效与轻量档默认 | 自动 | ✅ `0.2.0`：有效配置从 `initializationOptions` 下发，且缺省补 `link/schema mode=off` |
 | 链接资料采集 / 导入 / 更新 | task → `tiptop link …` | ✅ 可用 |
-| 链接关系就地查看（每条子文件可点） | Code Lens 挂在 **MAIN 函数头** | 🔧 计划中（需 `bdl-lsp` 实现 `textDocument/codeLens`） |
+| 链接关系查看 | `/bdl-link-chain <代码>`（文本）/ Code Lens 挂在 **MAIN 函数头** | ✅ `0.2.0` 文本版可查；🔧 Code Lens 待 `bdl-lsp` 实现（PLAN Z-P3-3） |
 | 字段资料采集 / 同步 | task → `tiptop schema …` | ✅ 可用 |
 | 表 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ `0.2.0`：`/bdl-schema-tables`、`/bdl-schema-columns` |
 | 上传 / 下载 / 预演上传（单文件） | task → `tiptop upload` / `download` | ✅ 可用 |
 | 编译 / 链接 / 预览（生产端执行） | task → `tiptop exec` | ✅ 可用 |
 | 整包部署 | task → `tiptop deploy -dry-run / -list` | ✅ 可用（CLI） |
-| 只读查询（资料状态、部署目标、环境自检） | slash command | ✅ `0.2.0`：8 条 `/bdl-…`（见 §4.2） |
+| 只读查询（资料状态、链接关系、部署目标、环境自检） | slash command | ✅ `0.2.0`：9 条 `/bdl-…`（见 §4.2） |
 | 工程初始化（生成 `.zed/{settings,tasks,bdl-tool}.json`） | task → `scripts/zed/init-workspace.{sh,ps1}` | ✅ `0.2.0`（交互式提问，不写密码） |
 | 二进制自动下载 | 首次打开时 | ✅ `0.2.0`：`bdl-lsp` 与 `tiptop` 都有四平台 Release，本地找不到时按平台自动下载 |
 | 编辑器标题栏按钮 / 状态栏 / 侧边栏树 / 输出面板 / Problems 注入 | — | ❌ Zed 无对应 API（永久差异，见 §6） |
@@ -241,6 +241,7 @@ bash .zed/bdl/init-workspace.sh          # Windows: pwsh -File .zed\bdl\init-wor
 |---|---|---|
 | `/bdl-env-check` | — | 生效设置摘要、`bdl-lsp`/`tiptop` 版本与路径、资料状态 |
 | `/bdl-link-status` | — | 链数 / orphan / ambiguous / 缺失文件 / 生成时间 / 局部更新 |
+| `/bdl-link-chain` | 程序代码 | 查该程序属于哪条链、链内有哪些文件（`模组/代码` 或带 `.4gl` 后缀都能写） |
 | `/bdl-schema-status` | — | 表数 / 列数 / 导入时间 / 来源 |
 | `/bdl-schema-tables` | 过滤（可空） | 表清单（大小写不敏感子串，支持 `^前缀` / `后缀$`） |
 | `/bdl-schema-columns` | 表名 | 列清单（名称 / 说明 / 类型 / 长度 / NULL） |

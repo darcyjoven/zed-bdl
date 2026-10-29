@@ -340,6 +340,137 @@ fn human_bytes(bytes: usize) -> String {
     }
 }
 
+/// 单条链在 Agent 面板里最多列多少个文件（超出的折叠成一行）。
+const CHAIN_FILE_LIMIT: usize = 30;
+
+/// 查某个程序代码所在的链（`/bdl-link-chain`）。
+///
+/// 这是 Code Lens（PLAN Z-P3-3，待实机验证）落地前的**替代视图**：
+/// 数据同样来自 tiptop 写的 `.project/link/links.jsonl`，只是以文本列出来。
+pub fn link_chain(worktree: &zed::Worktree, query: &str) -> String {
+    let needle = normalize_code(query);
+    if needle.is_empty() {
+        return "用法：/bdl-link-chain <程序代码>（如 axmt620；也可写 模组/代码 或带 .4gl 后缀）".to_string();
+    }
+    let Some(text) = read_text(worktree, LINKS_JSONL) else {
+        return format!(
+            "还没有链接资料：找不到 {LINKS_JSONL}\n\
+             \n\
+             采集方式（task: spawn → 搜 `4gl:`）：\n\
+             - `4gl: 链接资料：从 CSV 导入`（有 DS.GAL_FILE 导出时）\n\
+             - `4gl: 链接资料：全量更新`（直连 Oracle 时）"
+        );
+    };
+    let chains = parse_chains(&text);
+    let hits: Vec<&Value> = chains
+        .iter()
+        .filter(|chain| chain_has_code(chain, &needle))
+        .collect();
+    if hits.is_empty() {
+        return format!(
+            "在 {LINKS_JSONL} 的 {} 条链里没找到 {needle}。\n\
+             \n\
+             代码要与链接资料里的 GAL01/GAL03（程序代码）一致；也可以写 模组/代码。\n\
+             用 `/bdl-link-status` 看资料概况。",
+            chains.len()
+        );
+    }
+
+    let mut out = format!("== 链接关系：{needle}（命中 {} 条链）==\n", hits.len());
+    for (index, chain) in hits.iter().enumerate() {
+        let main = str_of(chain, "main").unwrap_or("(无 MAIN)");
+        let module = str_of(chain, "module").unwrap_or("-");
+        let program = str_of(chain, "program").unwrap_or("-");
+        out.push_str(&format!(
+            "\n[{}] MAIN {main}    模组 {module}    程序 {program}\n",
+            index + 1
+        ));
+        let files = chain.get("files").and_then(|v| v.as_array());
+        let total = files.map(|list| list.len()).unwrap_or(0);
+        out.push_str(&format!("  链内文件 {total} 个：\n"));
+        if let Some(list) = files {
+            for (i, file) in list.iter().enumerate().take(CHAIN_FILE_LIMIT) {
+                let pair = file.as_array();
+                let file_module = pair
+                    .and_then(|p| p.first())
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?");
+                let file_code = pair
+                    .and_then(|p| p.get(1))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?");
+                let here = file_code.to_lowercase() == needle
+                    || format!("{}/{}", file_module.to_lowercase(), file_code.to_lowercase())
+                        == needle;
+                out.push_str(&format!(
+                    "    {:>2}. {file_module}/{file_code}{}\n",
+                    i + 1,
+                    if here { "   ← 查询的文件" } else { "" }
+                ));
+            }
+            if total > CHAIN_FILE_LIMIT {
+                out.push_str(&format!("    …还有 {} 个（共 {total}）\n", total - CHAIN_FILE_LIMIT));
+            }
+        }
+    }
+    out.push_str(
+        "\n说明：这是**链接关系**（同一编译单元），不是调用关系；\n\
+         全局模组（sub/lib/qry）的可见性由 bdl-lsp 的扁平规则处理，不出现在 links.jsonl 里。\n\
+         就地可点的版本（Code Lens 挂在 MAIN 上）在 PLAN Z-P3-3，待实机验证后提供。",
+    );
+    out
+}
+
+/// 把用户输入规范化成对比键：去空白、去扩展名、全小写。
+fn normalize_code(input: &str) -> String {
+    let trimmed = input.trim().to_lowercase();
+    for suffix in [".4gl", ".per", ".global"] {
+        if let Some(stripped) = trimmed.strip_suffix(suffix) {
+            return stripped.trim().to_string();
+        }
+    }
+    trimmed
+}
+
+/// 逐行解析 `links.jsonl`，坏行直接跳过（资料可能写了一半或来自旧版本）。
+fn parse_chains(text: &str) -> Vec<Value> {
+    text.lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| zed::serde_json::from_str::<Value>(line).ok())
+        .collect()
+}
+
+/// 这条链里是否含该代码（代码本身或 `模组/代码`，大小写不敏感、可带扩展名）。
+///
+/// 入口自己会规范化 needle，调用方传原样输入也不会出错。
+fn chain_has_code(chain: &Value, needle: &str) -> bool {
+    let needle = normalize_code(needle);
+    if let Some(main) = str_of(chain, "main") {
+        if main.to_lowercase() == needle {
+            return true;
+        }
+    }
+    let Some(files) = chain.get("files").and_then(|v| v.as_array()) else {
+        return false;
+    };
+    files.iter().any(|file| {
+        let Some(pair) = file.as_array() else {
+            return false;
+        };
+        let module = pair
+            .first()
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let code = pair
+            .get(1)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_lowercase();
+        code == needle || format!("{module}/{code}") == needle
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,6 +501,30 @@ mod tests {
         assert!(matches_filter("APF001", "^APF001$"));
         assert!(!matches_filter("APF001", "^001"));
         assert!(matches_filter("APF001", "^$")); // 只写锚点 = 不过滤
+    }
+
+    #[test]
+    fn normalize_code_strips_suffix_and_case() {
+        assert_eq!(normalize_code("  AXMT620.4gl "), "axmt620");
+        assert_eq!(normalize_code("aap/PER/x.per"), "aap/per/x");
+        assert_eq!(normalize_code("helper_chain"), "helper_chain");
+    }
+
+    #[test]
+    fn chain_lookup_matches_code_and_module_code() {
+        let text = concat!(
+            r#"{"schema":1,"program":"APM100","module":"APM","main":"axmt620","files":[["APM","axmt620"],["APM","helper_chain"]]}"#,
+            "\n",
+            r#"{"schema":1,"program":"X","module":"SUB","main":"other","files":[["SUB","other"]]}"#,
+            "\n",
+        );
+        let chains = parse_chains(text);
+        assert_eq!(chains.len(), 2);
+        assert!(chain_has_code(&chains[0], "axmt620"));
+        assert!(chain_has_code(&chains[0], "apm/helper_chain"));
+        assert!(chain_has_code(&chains[0], "HELPER_CHAIN"));
+        assert!(!chain_has_code(&chains[0], "other"));
+        assert!(chain_has_code(&chains[1], "other"));
     }
 
     #[test]

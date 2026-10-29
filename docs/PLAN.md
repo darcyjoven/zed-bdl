@@ -272,7 +272,7 @@ zed.dev 官方语义：
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
 | 资料采集/导入/局部同步（link 5 条 + schema 11 条） | ✅ | ❌ | ⬇️ task 调 `tiptop …`（**0.2.0 起**：仓库提供 21 条 task 模板 + 交互式生成脚本 `scripts/zed/`） | Z-P1-2 |
-| 只读查询（状态/表清单/列清单/目标列表/预演） | ✅ | ❌ | ✅ **0.2.0 已落地**：8 条 slash command（读 `.project/` 资料；`/bdl-deploy-dry-run` 调 CLI） | Z-P1-1 |
+| 只读查询（状态/表清单/列清单/链接关系/目标列表/预演） | ✅ | ❌ | ✅ **0.2.0 已落地**：9 条 slash command（读 `.project/` 资料；`/bdl-deploy-dry-run` 调 CLI） | Z-P1-1 |
 | 上传/下载/预演上传（单文件） | ✅ | ❌ | ⬇️ task（`$ZED_RELATIVE_FILE` + `"save": "current"`；0.2.0 起由生成脚本产出） | Z-P1-2 |
 | 编译/链接/预览（生产端执行，6 条） | ✅ | ❌ | ⬇️ task 调 `tiptop exec`（`-region` / `-login-profile` 由生成脚本按区写入） | Z-P1-2 |
 | 整包部署（预演/列目标/执行） | ✅ CLI 用法 | ❌ | ⬇️ task 调 `tiptop deploy`；只读的预演/列目标另有 slash command | Z-P1-1 / Z-P1-2 |
@@ -340,7 +340,7 @@ cargo build --release --target wasm32-wasip2
 ### P1 · 命令入口（只改本仓库）
 
 > **进展（2026-10-29）**：Z-P1-1…Z-P1-4 **全部落地**并提交（`57a433b`）：
-> 8 条 slash command（`src/slash.rs` + `src/project.rs`）、capability 声明
+> 9 条 slash command（`src/slash.rs` + `src/project.rs`；`/bdl-link-chain` 为 Z-P2-2 的替代视图）、capability 声明
 > （格式已从宿主 `ExtensionManifest`/`capabilities.rs` 核实）、
 > `scripts/zed/init-workspace.{sh,ps1}`（20 固定 + 1 可选 task；bash 版实跑通过，
 > ps1 本机无 pwsh 未实跑、留 CI）、`/bdl-env-check` 深度版。
@@ -350,7 +350,7 @@ cargo build --release --target wasm32-wasip2
 
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|
-| **Z-P1-1** | 实现 `run_slash_command` + `[slash_commands.*]` 声明：8 条只读命令（`/bdl-env-check`、`/bdl-link-status`、`/bdl-schema-status`、`/bdl-schema-tables <过滤>`、`/bdl-schema-columns <表>`、`/bdl-deploy-list`、`/bdl-deploy-dry-run`、`/bdl-force-parse`） | `src/slash.rs` + `src/project.rs`、`extension.toml` | 命令名与声明一一对应（Z-P0-6 校验）；读文件类命令在无资料时给引导文案而非报错；`/bdl-force-parse` 在 P3-2 之前明确提示"需要服务端支持" | `src/**`、`extension.toml` |
+| **Z-P1-1** | 实现 `run_slash_command` + `[slash_commands.*]` 声明：9 条只读命令（`/bdl-env-check`、`/bdl-link-status`、`/bdl-link-chain <代码>`、`/bdl-schema-status`、`/bdl-schema-tables <过滤>`、`/bdl-schema-columns <表>`、`/bdl-deploy-list`、`/bdl-deploy-dry-run`、`/bdl-force-parse`） | `src/slash.rs` + `src/project.rs`、`extension.toml` | 命令名与声明一一对应（Z-P0-6 校验）；读文件类命令在无资料时给引导文案而非报错；`/bdl-force-parse` 在 P3-2 之前明确提示"需要服务端支持" | `src/**`、`extension.toml` |
 | **Z-P1-2** | task 模板与生成脚本：`scripts/zed/`（`init-workspace.sh` / `init-workspace.ps1`，交互式提问）+ 文档内置 task 模板（§3.3 清单） | `scripts/zed/**`、`README.md`、`docs/USER-GUIDE.md` | 脚本在干净项目里生成可用的 `.zed/{settings.json,tasks.json,bdl-tool.json}`；生成的 task 能在 Zed 里跑通（实机）；`.gitignore` 提示 secrets | `scripts/zed/**`、两份文档 |
 | **Z-P1-3** | 声明所需 capability（`process:exec` / `download_file`）：**先核实宿主 `ExtensionManifest.capabilities` 的确切字段格式再写**（官方 capabilities 文档只描述了用户侧 `granted_extension_capabilities` 的收紧格式） | `extension.toml` | 老版本 Zed 忽略未知键；新版本 Zed 首次使用按 capability 授权；文档说明用户可用 `granted_extension_capabilities` 收紧 | `extension.toml` |
 | **Z-P1-4** | `/bdl-env-check` 的深度版：显示生效设置摘要、`bdl-lsp`/`tiptop` 版本（跑 `version`）、资料目录状态、缺失项清单 | `src/lib.rs` | 输出可一条条对照 `docs/USER-GUIDE.md` §8 | `src/lib.rs` |
@@ -362,7 +362,7 @@ cargo build --release --target wasm32-wasip2
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|
 | **Z-P2-1** | **Code Lens 实机验证（必须先做）**：① `code_lens: "on"` 时同一 range 的多条 lens 是否**各占一行**；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件；③ 决定了实现方式后再投入 Z-P3-3 | 需要**有 GUI 的机器**；结论回写本文件与 USER-GUIDE | 三条结论有截图/录屏；若②不成立，改用备选方案（终端清单 + `lsp command selector`）并更新 §8 | 本文件 + USER-GUIDE |
-| **Z-P2-2** | 链接关系终端清单 task：打印 MAIN 与链内子文件（含全局模组）路径清单，终端路径可点击 | `scripts/zed/**`、文档 | 无链接资料时提示先采集；有资料时清单与 `tiptop link status` 口径一致 | `scripts/zed/**`、文档 |
+| **Z-P2-2** | 链接关系视图的替代：① ✅ **已落地** slash command `/bdl-link-chain <代码>`（读 `links.jsonl`，Agent 面板文本；最多 30 个文件）——比终端清单跨平台、可单测；② 待做：**迁移旧资料目录**（`.link/` → `.project/link/` 等）的 task/脚本（0.2.0 未产出） | `src/project.rs`、`scripts/zed/**`、文档 | ①✅ 单测覆盖（命中 / 未命中 / 大小写 / 带后缀）；②待做：迁移不覆盖已有文件并打印搬了什么 | `src/project.rs`、`scripts/zed/**`、文档 |
 | **Z-P2-3** | 字段资料只读列表（slash）与 `RECORD LIKE` 体验文档化 | `src/lib.rs`、`docs/USER-GUIDE.md` | `/bdl-schema-tables`、`/bdl-schema-columns` 输出正确 | `src/lib.rs`、USER-GUIDE |
 | **Z-P2-4** | **让 `ext.*` 真正生效**（本轮盘点发现的空档）：① 生成脚本按问答**合成 `.project/deploy/deploy.json`**（对应 VSCode `deployconfig.ts` 的 `ensureDeployConfig`）—— ✅ **已完成**（bash + ps1 两个脚本；`verify-init-script.py` 两个场景覆盖"生成 / 已存在写 `.bdl-new`"）；② 生成脚本回读 `ext.build.*` 模板（否则这些键没有消费者）；③ 可选：`ext.deploy.enable=false` 时 `/bdl-deploy-*` 给提示 | `scripts/zed/**`、文档 | ①✅ 填了生产环境的项目能直接 `tiptop upload/download/deploy`；②待做：模板改 `ext.build.*` 后重跑生成脚本能得到新命令 | `scripts/zed/**`、文档 |
 
@@ -545,7 +545,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
   └─ 门槛：verify-manifest / verify-queries / wasm build 全绿
 
 【第二轮 · 命令入口】
-  Z-P1-1 slash command（8 条只读）
+  Z-P1-1 slash command（9 条只读）
   Z-P1-2 task 模板 + 初始化脚本
   Z-P1-3 capabilities 声明
   Z-P1-4 /bdl-env-check 深度版

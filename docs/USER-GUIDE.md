@@ -50,7 +50,7 @@
 | **轻量档默认**（不写 `link/schema` 时补 `mode:"off"`） | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-3） |
 | 语义高亮（扩展自带 `semantic_token_rules.json`） | `"semantic_tokens": "combined"` | ✅ 0.2.0 已提供规则（**着色效果 ⚠️ 待实机核实**） | P0（Z-P0-4） |
 | `tiptop` 四级二进制定位 | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-5） |
-| 只读 slash command（8 条）+ task 生成脚本 + 扩展 `capabilities` 声明 | Agent 面板 `/bdl-…`；`scripts/zed/init-workspace.{sh,ps1}`；自动（首次弹授权） | ✅ 0.2.0 已落地 | P1（Z-P1-1 / Z-P1-2 / Z-P1-3） |
+| 只读 slash command（9 条）+ task 生成脚本 + 扩展 `capabilities` 声明 | Agent 面板 `/bdl-…`；`scripts/zed/init-workspace.{sh,ps1}`；自动（首次弹授权） | ✅ 0.2.0 已落地 | P1（Z-P1-1 / Z-P1-2 / Z-P1-3） |
 | 项目初始化（拉代码，task 可挂载）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → 自备 `scripts/init-project/` 同款脚本 / 小脚本 | ✅ 0.2.0 已落地（生成脚本可挂载 init-project task）/ 🔧 计划中（迁移仍手工） | P1（Z-P1-2） |
 | 表清单 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ 0.2.0 已落地 | P1（Z-P1-1） |
 | 链接关系查看：终端清单（当前替代）+ 就地 Code Lens | task 打印清单 / Code Lens 挂在 **MAIN** 上 | 🔧 计划中 | P2（Z-P2-2）→ 验证后 P3（Z-P2-1 / Z-P3-3） |
@@ -405,7 +405,7 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 > 📷 待补：`tiptop link status` 的中文输出（链数、生成时间、模组根）（docs/images/zed/09-link-status.png）
 > 🎬 待补：`tiptop link sync` 全量采集进度（采集/扫描源码/成链/写入完成）（docs/images/zed/10-link-sync-progress.mp4）
 
-### 3.2 在 Zed 里查看链接关系 [🔧 计划中·P3（Code Lens）/ 🔧 计划中·P2（终端清单）]
+### 3.2 在 Zed 里查看链接关系 [✅ 0.2.0 已落地（`/bdl-link-chain`）/ 🔧 计划中·P3（Code Lens）]
 
 **计划（Z-P3-3）**：`bdl-lsp` 实现 `textDocument/codeLens`，把**链内子文件**各做一条 Code Lens 挂在 **MAIN 程序块**头上（数据来自链接资料内存树），上限默认 10 条 + 一条「…共 M 个」汇总行。在 Zed 上可行是因为 **Code Lens 是宿主的 LSP 客户端功能**：服务端实现，用户在 `languages."Genero BDL"` 下开 `"code_lens": "on"`（**默认 `off`**）即可看到。
 
@@ -413,8 +413,13 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 
 > 📷 待补：Code Lens 挂在 MAIN 上（开 code_lens: "on" 后）（docs/images/zed/11-code-lens-main.png）
 
-**当前可用的替代（Z-P2-2）**：一个 task 打印 MAIN 与链内子文件（含全局模组）的**路径清单**，
-终端里的路径可点击直达文件；今天可先跑 `tiptop link status -root .` 确认资料存在，再打开 `.project/link/links.jsonl` 看原始链。
+**当前可用的替代（Z-P2-2 ①，已随 0.2.0 提供）**：Agent 面板里执行
+`/bdl-link-chain <程序代码>`（例如 `/bdl-link-chain axmt620`，也可写 `APM/axmt620` 或带 `.4gl` 后缀）——
+它读 `.project/link/links.jsonl`，列出命中链的 **MAIN / 模组 / 程序号** 与**链内全部文件**（最多 30 个，超出折叠），
+命中查询的那一行会标 `← 查询的文件`。也可先跑 `tiptop link status -root .` 确认资料存在，或直接看 `.project/link/links.jsonl` 原始行。
+
+> 与终端清单的差异：slash command 输出在 **Agent 面板**（路径不可点击），但跨平台、可单测；
+> 「终端清单 task」当前**没有**产出（PLAN Z-P2-2 ② 连同"迁移旧资料目录"一起待做）。
 
 > 📷 待补：终端清单里 MAIN 与子文件路径清单（docs/images/zed/12-link-tree-terminal.png）
 
@@ -1038,12 +1043,13 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 ### 8.5 slash command 总表 [✅ 0.2.0 已落地（`/bdl-force-parse` 为 🔧 计划中·P3）]
 
-入口是 Zed 的 **Agent 面板**（slash command 只在 Agent 面板里可用，**不在命令面板**）。8 条命令的实现见 `src/slash.rs` + `src/project.rs`，声明在 `extension.toml` 的 `[slash_commands.*]`（`tests/verify-manifest.py` 静态校验一一对应）。
+入口是 Zed 的 **Agent 面板**（slash command 只在 Agent 面板里可用，**不在命令面板**）。9 条命令的实现见 `src/slash.rs` + `src/project.rs`，声明在 `extension.toml` 的 `[slash_commands.*]`（`tests/verify-manifest.py` 静态校验一一对应）。
 
 | 名称 | 参数 | 做什么 | 阶段 |
 |---|---|---|---|
 | `/bdl-env-check` | 无 | 显示生效设置摘要（链接/字段 mode、dataDir、Genero 版本、日志级别）、两个二进制的路径与版本（实跑 `version`）、资料文件是否存在，并打印生效配置原文 | ✅ 0.2.0 |
 | `/bdl-link-status` | 无 | 读 `.project/link/links.meta.json` + `links.jsonl`，显示链 / orphan / ambiguous / 缺失文件 / 生成时间 / 来源 / 局部更新 / 链内文件数；**没有资料时给的是引导文案，不是报错** | ✅ 0.2.0 |
+| `/bdl-link-chain` | 程序代码 | 读 `links.jsonl`，列出该程序所在的链（MAIN / 模组 / 程序号）与链内文件（最多 30 个，超出折叠）；这是 **Code Lens 落地前的替代视图**，并会说明「链接关系 ≠ 调用关系」 | ✅ 0.2.0 |
 | `/bdl-schema-status` | 无 | 读 `.project/schema/tables.json`，显示表数 / 列数 / 导入时间 / 来源 / 原始行数 | ✅ 0.2.0 |
 | `/bdl-schema-tables` | 过滤子串 | 列表面（**大小写不敏感子串**，支持 `^前缀` / `后缀$` 锚点，**不是完整正则**，与 VSCode 树视图不同）；一次最多列 **200 行** | ✅ 0.2.0 |
 | `/bdl-schema-columns` | 表名 | 读 `.project/schema/tables/<大写表名>.json`，列出 名称 / 类型(长度) / NULL / 说明 | ✅ 0.2.0 |
@@ -1257,7 +1263,7 @@ tiptop link status -root .        # 看生成时间与天数、局部更新 part
 
 **Zed 侧（本仓库）**
 
-- `zed-extension/extension.toml` —— 扩展 id `4gl-full`、版本 `0.2.0`、grammar `rev`、`[language_servers.bdl-lsp]` 与 language id 映射（`Genero BDL`→`bdl`，`Genero Form`→`per`）、`[slash_commands.*]`（8 条）与 `[[capabilities]]` 声明
+- `zed-extension/extension.toml` —— 扩展 id `4gl-full`、版本 `0.2.0`、grammar `rev`、`[language_servers.bdl-lsp]` 与 language id 映射（`Genero BDL`→`bdl`，`Genero Form`→`per`）、`[slash_commands.*]`（9 条）与 `[[capabilities]]` 声明
 - `zed-extension/src/`（`lib.rs` / `config.rs` / `binary.rs` / `project.rs` / `slash.rs`）—— 二进制定位四级顺序与 `~/` 展开（`binary.rs`）、三层配置合并与轻量档默认（`config.rs`）、资料只读渲染与表名过滤语法（`project.rs`）、slash command 分派与 capability 依赖（`slash.rs`）、`initialization_options` / `workspace_configuration` 下发（`lib.rs`）（§1.2 / §1.3 / §4.3 / §8.5 照此写）
 - `zed-extension/docs/PLAN.md` —— 基线、Zed 平台能力边界（§4.1–4.4）、差距矩阵与降级方案（§6 / §8）、阶段任务 P0–P5（§7）、实机验收清单（§11.2）、风险（§12）
 - `zed-extension/README.md` —— 能力一览、安装、配置示例、task/slash 列表（口径一致性核对）

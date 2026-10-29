@@ -21,6 +21,7 @@ use crate::project;
 pub const SLASH_COMMANDS: &[&str] = &[
     "bdl-env-check",
     "bdl-link-status",
+    "bdl-link-chain",
     "bdl-schema-status",
     "bdl-schema-tables",
     "bdl-schema-columns",
@@ -67,6 +68,16 @@ pub fn run(
     let text = match command {
         "bdl-env-check" => env_check(worktree, &settings),
         "bdl-link-status" => project::link_status(worktree),
+        "bdl-link-chain" => {
+            let Some(code) = args.first() else {
+                return Ok(output(
+                    "用法：/bdl-link-chain <程序代码>（如 axmt620；也可写 模组/代码 或带 .4gl 后缀）\n\
+                     这是链接关系视图的替代：看某个程序在 links.jsonl 里属于哪条链、链内有哪些文件。"
+                        .to_string(),
+                ));
+            };
+            project::link_chain(worktree, code)
+        }
         "bdl-schema-status" => project::schema_status(worktree),
         "bdl-schema-tables" => project::schema_tables(worktree, args.first().map(|s| s.as_str())),
         "bdl-schema-columns" => {

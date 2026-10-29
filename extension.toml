@@ -42,6 +42,10 @@ requires_argument = false
 description = "链接资料状态：链数 / orphan / ambiguous / 缺失文件 / 生成时间 / 局部更新"
 requires_argument = false
 
+[slash_commands.bdl-link-chain]
+description = "查某个程序所在的链与链内文件（参数：程序代码，可写 模组/代码 或带 .4gl 后缀）"
+requires_argument = true
+
 [slash_commands.bdl-schema-status]
 description = "字段资料状态：表数 / 列数 / 导入时间 / 来源"
 requires_argument = false
