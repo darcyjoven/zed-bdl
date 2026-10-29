@@ -27,16 +27,17 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 | SQL 注入 | `.4gl` 里 `SELECT`/`INSERT`/`UPDATE`/`DELETE` | ✅ 按 SQL 高亮 |
 | 诊断 | 编辑时（Problems） | ✅ 14 个静态码 + 动态 `missing-<kind>` |
 | 悬停 / 跳转 / 引用 / 补全 / 重命名 / Code Action / 格式化 | Zed 原生命令 | ✅ 由 `bdl-lsp` 提供；重命名只改当前文件，`.per` 不格式化 |
-| 语义高亮 | `"semantic_tokens": "combined"` | 🔧 计划中（`0.2.0`，需加扩展级规则文件） |
-| 设置生效与轻量档默认 | 自动 | 🔧 计划中（`0.2.0`）：今天 `lsp.bdl-lsp.settings` 不会到达服务端，且不写设置等于"开资料功能" |
+| 语义高亮 | `"semantic_tokens": "combined"` | ✅ `0.2.0`：扩展自带 `semantic_token_rules.json`（8 条规则，带主题回退） |
+| 设置生效与轻量档默认 | 自动 | ✅ `0.2.0`：有效配置从 `initializationOptions` 下发，且缺省补 `link/schema mode=off` |
 | 链接资料采集 / 导入 / 更新 | task → `tiptop link …` | ✅ 可用 |
 | 链接关系就地查看（每条子文件可点） | Code Lens 挂在 **MAIN 函数头** | 🔧 计划中（需 `bdl-lsp` 实现 `textDocument/codeLens`） |
 | 字段资料采集 / 同步 | task → `tiptop schema …` | ✅ 可用 |
-| 表 / 列清单（无侧边栏树） | slash command 文本列表 | 🔧 计划中 |
+| 表 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ `0.2.0`：`/bdl-schema-tables`、`/bdl-schema-columns` |
 | 上传 / 下载 / 预演上传（单文件） | task → `tiptop upload` / `download` | ✅ 可用 |
 | 编译 / 链接 / 预览（生产端执行） | task → `tiptop exec` | ✅ 可用 |
 | 整包部署 | task → `tiptop deploy -dry-run / -list` | ✅ 可用（CLI） |
-| 只读查询（资料状态、部署目标、环境自检） | slash command | 🔧 计划中 |
+| 只读查询（资料状态、部署目标、环境自检） | slash command | ✅ `0.2.0`：8 条 `/bdl-…`（见 §4.2） |
+| 工程初始化（生成 `.zed/{settings,tasks,bdl-tool}.json`） | task → `scripts/zed/init-workspace.{sh,ps1}` | ✅ `0.2.0`（交互式提问，不写密码） |
 | 二进制自动下载 | 首次打开时 | 🔧 计划中（`bdl-lsp` 已有 Release；`tiptop` 需先建 Release） |
 | 编辑器标题栏按钮 / 状态栏 / 侧边栏树 / 输出面板 / Problems 注入 | — | ❌ Zed 无对应 API（永久差异，见 §6） |
 
@@ -133,12 +134,19 @@ cd tiptop;  powershell -File scripts\build.ps1
 - `link.mode` / `schema.mode` 三态 `off | file | db`，**默认 `off`（轻量档：不连库、不写工作区）**；导入 CSV 后设 `file`，直连 Oracle 设 `db`。
 - `diagnostics` 是逐诊断码调级的**唯一入口**（`off | error | warning | information | hint`）。
 - `ext.build.*.command` 里的占位符与 VSCode 一致，分隔符恒为 `/`：`${path}`（两层，如 `axc/4gl`）、`${fullpath}`（三层）、`${name}`（去扩展名）、`${fullname}`（含扩展名）。
+  ⚠️ **Zed 侧这些键目前只是记录**：task 读不到 Zed 设置，生成脚本用内置默认模板，
+  真正生效的是 **`.zed/tasks.json` 里各 task 的 `-command`**（plan Z-P2-4 会让生成脚本读它们）。
+- ⚠️ **上传/下载/部署需要 `.project/deploy/deploy.json`**：VSCode 插件会按 `bdl.prod.deploy.*`
+  自动合成它，Zed 目前**要你手写**（样例见 [USER-GUIDE §5.4](docs/USER-GUIDE.md)）。
+  `settings.ext.prod.deploy.*` 同样只是记录（plan Z-P2-4）。
 - 完整键表与示例见 [USER-GUIDE §8](docs/USER-GUIDE.md)。
 
-> ⚠️ **当前版本（0.1.1）的已知问题**：`settings` 里的键不会到达 `bdl-lsp`（服务端不发
-> `workspace/configuration`），且不写 `link/schema` 时服务端按"启用"兜底。
-> 这两点由 [PLAN Z-P0-3](docs/PLAN.md) 修复；在此之前请用
-> `lsp.bdl-lsp.initialization_options` 下发同样的内容（优先级最高）。
+> ℹ️ **`0.2.0` 起配置已生效**：Zed 的 `lsp.<server>.settings` 只在服务端请求
+> `workspace/configuration` 时下发，而 `bdl-lsp` 不发这个请求，所以扩展把
+> `lsp.bdl-lsp.initialization_options` ⊕ `settings`（去掉仅扩展自用的 `ext`）
+> ⊕ 轻量档默认（`link/schema mode=off`）合并后从 `initializationOptions` 下发。
+> 代价是**改配置要重启语言服务器**（`lsp: restart language server`），
+> 等服务端支持 `workspace/configuration`（PLAN Z-P3-1）后即可热更新。
 
 ---
 
@@ -179,18 +187,31 @@ Zed 扩展**无法注册命令到命令面板**，所以：
   {
     "label": "4gl: 4GL 编译",
     "command": "tiptop",
-    "args": ["exec", "-command", "cd axc/4gl && c2 $ZED_STEM", "-region", "1",
+    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM", "-region", "1",
              "-login-profile", "/u1/usr/profile/profile.topprod"],
     "cwd": "$ZED_WORKTREE_ROOT"
   }
 ]
 ```
 
-- `4gl: 初始化 Zed 工程` 任务（计划中）会在**终端里交互提问**主机/账号/区/模板，
-  生成 `.zed/{settings.json,tasks.json,bdl-tool.json}`——task 读不到 Zed 设置，所以凭证与模板
-  由生成脚本落文件。
+- **不想手写这些 task？** 用仓库里的交互式脚本一次生成（它会提问主机/账号/区/模板，
+  然后把值内联进 `.zed/tasks.json`）：
+
+```bash
+# 把脚本放进项目里（或直接指向本仓库路径）
+mkdir -p .zed/bdl && cp -r <zed-bdl 仓库>/scripts/zed/* .zed/bdl/
+bash .zed/bdl/init-workspace.sh          # Windows: pwsh -File .zed\bdl\init-workspace.ps1
+```
+
+  然后在 Zed 里 `task: spawn` → `4gl: 初始化 Zed 工程（生成 .zed 配置）` 也行。
+  **脚本绝不写密码**：密码放 `<项目根>/.project/secrets.json`（Unix `chmod 600`）
+  或环境变量 `BDL_ORA_PASSWORD`。
 - 可用变量：`$ZED_FILE`、`$ZED_RELATIVE_FILE`、`$ZED_RELATIVE_DIR`、`$ZED_STEM`、
   `$ZED_WORKTREE_ROOT`、`$ZED_LANGUAGE`、`${VAR:默认值}`。
+- ⚠️ **不要把 tiptop/VSCode 的模板占位符 `${path}`/`${name}`/`${fullname}` 写进 task**：
+  Zed 会把 `$…`/`${…}` 当成**自己的** task 变量，未知变量会让整条 task 从 `task: spawn`
+  列表里消失、或被替换成空串。Zed 里请用 `$ZED_RELATIVE_DIR`（= `${path}`/`${fullpath}`）、
+  `$ZED_STEM`（= `${name}`）、`$ZED_FILENAME`（= `${fullname}`）。
 - 取消：task 设 `"use_new_terminal": false` + `"allow_concurrent_runs": true`，重跑即可取消上一次。
 - 快捷键绑定（`keymap.json`）：
 
@@ -200,20 +221,21 @@ Zed 扩展**无法注册命令到命令面板**，所以：
 
 > 完整 task 总表见 [USER-GUIDE §8.4](docs/USER-GUIDE.md)。
 
-### 4.2 slash command（计划中）
+### 4.2 slash command（`0.2.0` 起可用）
 
 | 命令 | 参数 | 说明 |
 |---|---|---|
 | `/bdl-env-check` | — | 生效设置摘要、`bdl-lsp`/`tiptop` 版本与路径、资料状态 |
-| `/bdl-link-status` | — | 链数 / 文件数 / 生成时间 / 局部更新 |
+| `/bdl-link-status` | — | 链数 / orphan / ambiguous / 缺失文件 / 生成时间 / 局部更新 |
 | `/bdl-schema-status` | — | 表数 / 列数 / 导入时间 / 来源 |
-| `/bdl-schema-tables` | 正则（可空） | 表清单（大小写不敏感过滤） |
-| `/bdl-schema-columns` | 表名 | 列清单（名称 / 说明 / 类型 / 长度） |
+| `/bdl-schema-tables` | 过滤（可空） | 表清单（大小写不敏感子串，支持 `^前缀` / `后缀$`） |
+| `/bdl-schema-columns` | 表名 | 列清单（名称 / 说明 / 类型 / 长度 / NULL） |
 | `/bdl-deploy-list` | — | `tiptop deploy -list` |
-| `/bdl-deploy-dry-run` | — | `tiptop deploy -dry-run -json`（只打印） |
-| `/bdl-force-parse` | — | 强制解析当前文件（需服务端 `executeCommand`） |
+| `/bdl-deploy-dry-run` | — | `tiptop deploy -dry-run`（只打印） |
+| `/bdl-force-parse` | — | 强制解析当前文件（需服务端 `executeCommand`，PLAN Z-P3-2） |
 
-**会写盘的操作不进 slash command**，只给 task。
+**会写盘的操作不进 slash command**，只给 task；slash command 只读 `.project/` 资料
+和跑 `tiptop` 的只读/预演子命令。过滤语法与 VSCode 树视图的完整正则略有差异（见上表）。
 
 ---
 
@@ -286,7 +308,8 @@ python3 tests/verify-manifest.py        # 清单 17 项（id/版本/grammar rev/
 export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字覆盖 / 真实语料编译）
-cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认）
+cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
+python3 tests/verify-init-script.py     # .zed 初始化脚本产物（task 齐全 / 无 ${…} 占位符 / 不写密码）
 cargo build --release --target wasm32-wasip2
 ```
 

@@ -5,7 +5,7 @@
 | 项目 | 值 |
 |---|---|
 | 扩展 id | **`4gl-full`**（仓库 `zed-bdl`；可与只有 grammar 的轻量扩展 `bdl` 共存） |
-| 本手册对应版本 | 扩展 **`0.1.1`** → 目标 `0.2.0`（阶段见 [PLAN §7](PLAN.md)） |
+| 本手册对应版本 | 扩展 **`0.2.0`**（阶段见 [PLAN §7](PLAN.md)） |
 | 语言服务器 | `bdl-lsp` **v0.3.14**（已有 Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`） |
 | 采集 / 部署 CLI | `tiptop` 源码 **0.1.10**（**尚无 tag、无 Release**，只能手工构建） |
 | 参照物 | VSCode 插件 `4gl-full` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏树视图） |
@@ -15,17 +15,20 @@
 
 | 标记 | 含义 | 你现在能做什么 |
 |---|---|---|
-| ✅ 当前可用 | 今天就能用（`0.1.1` 已实现，或由 Zed 宿主直接提供） | 直接照命令执行 |
-| 🔧 计划中·P0…P4 | 已排期、方案已确认 | 看「当前替代」；别去找还不存在的入口 |
+| ✅ 当前可用 | 今天就能用（`0.2.0` 已实现，或由 Zed 宿主直接提供） | 直接照命令执行 |
+| ✅ 0.2.0 已落地 | 原 P0/P1 计划项已随 `0.2.0` 实现 | 直接用，不必再找替代入口 |
+| 🔧 计划中·P2…P5 | 已排期、方案已确认 | 看「当前替代」；别去找还不存在的入口 |
 | ⬇️ 降级替代 | Zed 没有对应 UI API，功能换入口，能力仍在 | 用文档给的 task / slash command / keymap |
 | ❌ 平台不支持 | Zed 平台**永久**没有该能力（不是没做完） | 接受差异，或改用终端 |
 | ⚠️ 待实机核实 | 依赖一台装了 Zed 的 GUI 机器才能定论（本沙箱无 GUI） | 见对应章节的核实项 |
 
 **两个入口**：会写盘、耗时长、需要交互输入的事（采集 / 导入 / 同步 / 上传 / 下载 / 部署 / 初始化）→ **task**；只读短查询（状态 / 表清单 / 列清单 / 部署目标 / 环境自检）→ **slash command**（Agent 面板，`/bdl-…`）。Zed 扩展**无法注册任意命令到命令面板**，所以「命令面板里搜 `4gl:` 就有 33 条命令」在 Zed 上**不存在**（§9）。
 
+**0.2.0 起配置会真正下发到 `bdl-lsp`**（`settings` 合并进 `initializationOptions`）；但生效配置**只在语言服务器启动时读一次**——**改了 `lsp.bdl-lsp.settings` 必须重启语言服务器**（§1.3 / §10.7）。
+
 ---
 
-## 0. 实现状态总表 [✅ 当前可用 / 🔧 计划中·P0…P4 / ⬇️ 降级替代 / ❌ 平台不支持 / ⚠️ 待实机核实]
+## 0. 实现状态总表 [✅ 当前可用 / ✅ 0.2.0 已落地 / 🔧 计划中·P2…P5 / ⬇️ 降级替代 / ❌ 平台不支持 / ⚠️ 待实机核实]
 
 一句话口径：**语言智能（诊断/悬停/跳转/引用/补全/重命名/Code Action/格式化）与语法高亮今天就能用，且是同一个 `bdl-lsp` 与同一套 tree-sitter grammar；差的全部是 VSCode 的 UI 容器能力与命令入口。**
 
@@ -43,13 +46,13 @@
 | 上传当前文件 / 预演上传 / 下载当前文件（单文件） | task → `tiptop upload` / `download` | ✅ 当前可用 | — |
 | 4GL / Form 的预演编译 / 编译 / 链接 / 预览画面 | task → `tiptop exec`（生产端执行） | ✅ 当前可用 | — |
 | 整包部署（`-dry-run` / `-list` / `-json`） | 终端 → `tiptop deploy`（**只有命令行**） | ✅ 当前可用 | — |
-| **用户设置真正到达 `bdl-lsp`** | 自动 | 🔧 计划中 | P0（Z-P0-3） |
-| **轻量档默认**（不写 `link/schema` 时不启用资料） | 自动 | 🔧 计划中 | P0（Z-P0-3） |
-| 语义高亮（扩展自带 `semantic_token_rules.json`） | `"semantic_tokens": "combined"` | 🔧 计划中 | P0（Z-P0-4） |
-| `tiptop` 四级二进制定位 | 自动 | 🔧 计划中 | P0（Z-P0-5） |
-| 只读 slash command（8 条）+ task 模板/生成脚本 + 扩展 `capabilities` 声明 | Agent 面板 `/bdl-…`；`.zed/tasks.json`；自动（首次弹授权） | 🔧 计划中 | P1（Z-P1-1 / Z-P1-2 / Z-P1-3） |
-| 项目初始化（拉代码）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → `scripts/init-project/` 同款脚本 / 小脚本 | 🔧 计划中 | P1（Z-P1-2） |
-| 表清单 / 列清单（无侧边栏树） | slash command 文本列表 | 🔧 计划中 | P1（Z-P1-1） |
+| **用户设置真正到达 `bdl-lsp`** | 自动 | ✅ 0.2.0 已落地（改完**需重启语言服务器**） | P0（Z-P0-3） |
+| **轻量档默认**（不写 `link/schema` 时补 `mode:"off"`） | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-3） |
+| 语义高亮（扩展自带 `semantic_token_rules.json`） | `"semantic_tokens": "combined"` | ✅ 0.2.0 已提供规则（**着色效果 ⚠️ 待实机核实**） | P0（Z-P0-4） |
+| `tiptop` 四级二进制定位 | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-5） |
+| 只读 slash command（8 条）+ task 生成脚本 + 扩展 `capabilities` 声明 | Agent 面板 `/bdl-…`；`scripts/zed/init-workspace.{sh,ps1}`；自动（首次弹授权） | ✅ 0.2.0 已落地 | P1（Z-P1-1 / Z-P1-2 / Z-P1-3） |
+| 项目初始化（拉代码，task 可挂载）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → 自备 `scripts/init-project/` 同款脚本 / 小脚本 | ✅ 0.2.0 已落地（生成脚本可挂载 init-project task）/ 🔧 计划中（迁移仍手工） | P1（Z-P1-2） |
+| 表清单 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ 0.2.0 已落地 | P1（Z-P1-1） |
 | 链接关系查看：终端清单（当前替代）+ 就地 Code Lens | task 打印清单 / Code Lens 挂在 **MAIN** 上 | 🔧 计划中 | P2（Z-P2-2）→ 验证后 P3（Z-P2-1 / Z-P3-3） |
 | 反查引用（**函数级**口径） | Code Lens / `executeCommand` | 🔧 计划中 | P3（Z-P3-2 / Z-P3-3） |
 | 设置热更新 + `workspace/executeCommand` 通道 | 改 `settings` / slash 间接调用 | 🔧 计划中 | P3（Z-P3-1 / Z-P3-2） |
@@ -65,7 +68,7 @@
 
 ---
 
-## 1. 安装与准备 [✅ 当前可用 / 🔧 计划中·P0/P1/P4]
+## 1. 安装与准备 [✅ 当前可用 / 🔧 计划中·P4]
 
 ### 1.1 安装扩展 [✅ 当前可用（dev extension）/ 🔧 计划中·注册表发布]
 
@@ -75,7 +78,7 @@
 Zed 命令面板（cmd-shift-p / ctrl-shift-p）→ 输入 zed: install dev extension → 选择本仓库目录
 ```
 
-加载成功后扩展面板里应出现 **`4gl-full`**（名称 `Genero BDL & Form (Full)`，版本 `0.1.1`）。
+加载成功后扩展面板里应出现 **`4gl-full`**（名称 `Genero BDL & Form (Full)`，版本 `0.2.0`）。
 
 > 📷 待补：扩展面板中显示 4gl-full 已加载（docs/images/zed/01-install-extension-panel.png）
 
@@ -129,14 +132,14 @@ tiptop  version      # 期望 0.1.10
 3. 工作区内的 `<工作区根>/.bdl-lsp/bin/bdl-lsp`（Windows 为 `bdl-lsp.exe`）；
 4. `PATH` 里的 `bdl-lsp`。
 
-四级都找不到时，Zed 会在「语言服务器」状态里显示**可操作**的错误（列出这四条与构建方法）。`tiptop` 的四级查找（`ext.tools.path` → `TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/tiptop[.exe]` → `PATH`）是 **🔧 计划中·P0（Z-P0-5）**；**今天 `tiptop` 只由 task 调用**，请确保它在 `PATH` 里，或在 `.zed/tasks.json` 里写**绝对路径**（task **读不到 Zed 设置**，见 §8.4）：
+四级都找不到时，Zed 会在「语言服务器」状态里显示**可操作**的错误（列出这四条与构建方法）。`tiptop` 同样有四级查找（`ext.tools.path` → `TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/tiptop[.exe]` → `PATH`），**✅ 0.2.0 已落地（Z-P0-5）**——slash command（`/bdl-env-check`、`/bdl-deploy-*`）会按这四级自动找到 `tiptop`；而 task **读不到 Zed 设置**（§8.4），所以 task 里要么让它在 `PATH` 里，要么写**绝对路径**：
 
 ```bash
 export PATH="/path/to/tiptop/artifacts/bin:$PATH"
 tiptop version
 ```
 
-### 1.3 配置语言服务器 [🔧 计划中·P0（设置下发修正）/ ✅ 写法不变]
+### 1.3 配置语言服务器 [✅ 0.2.0 已落地（设置下发）/ ✅ 写法不变]
 
 **只写一处**：`lsp.bdl-lsp.settings`。扩展读不到别的设置分类
 （公开 API 只有 `LspSettings::for_worktree`，即 `lsp.<server>` 整块）。
@@ -191,12 +194,22 @@ tiptop version
 
 键名规则（最容易写错的地方）：下发给服务端的键与 `internal/config.Settings` **完全同名、无 `bdl.` 前缀**（VSCode 写 `bdl.diagnostics`，Zed 就是 `diagnostics`）；只属于扩展的键一律收在 **`ext`** 下，**不下发**；`binary.path` / `binary.arguments` / `binary.env` 是 **Zed 原生键**，不放在 `settings` 里。
 
-**⚠️ 0.1.1 的两个已知问题（P0 修复，Z-P0-3）**：
+**✅ 0.2.0 已落地（原 P0 修复，Z-P0-3）**：扩展在语言服务器启动时把三层合并后从 `initializationOptions` 下发，`settings` 里的键**会真正到达 `bdl-lsp`**：
 
-1. **`settings` 里的键今天到不了 `bdl-lsp`**：Zed 的 `lsp.<server>.settings` 只在服务端发 `workspace/configuration` 时作为应答下发，而 `bdl-lsp` **从不发该请求**。修法已定：扩展把「默认值 ⊕ `settings`（去掉 `ext`）⊕ `initialization_options`」合进 `initialization_options` 下发。
-2. **不写 `link` / `schema` 时服务端按「启用」兜底**（`LinkEnabled()` / `SchemaEnabled()` 在客户端未下发时返回 `true`），等于"什么都不配"反而比 VSCode 的轻量档更重；修法：显式补 `mode: "off"`。
+```text
+initialization_options（逃生口，最高优先级）
+  ⊕ settings（去掉仅扩展自用的 ext）
+  ⊕ 轻量档默认（link/schema 未显式配置时补 mode="off"）
+```
 
-**P0 之前的生效路径**：用 `lsp.bdl-lsp.initialization_options`（优先级最高，是逃生口）：
+同一份合并结果也作为 `workspace/configuration` 的应答返回（`bdl-lsp` 目前不请求它，服务端支持后自然生效，PLAN Z-P3-1）。原来「两个已知问题」现在的状态：
+
+1. `settings` 里的键到不了 `bdl-lsp` → **✅ 已合并进 `initializationOptions` 下发，直接写 `settings` 即可**。
+2. 不写 `link` / `schema` 时服务端按「启用」兜底（`LinkEnabled()` / `SchemaEnabled()` 在客户端未下发时返回 `true`）→ **✅ 扩展显式补 `mode:"off"`**（只在用户既没写 `mode` 也没写旧写法 `enable` 时补，不会覆盖显式配置）。
+
+**代价（务必记住）**：生效配置**只在语言服务器启动时下发一次** —— **改了 `settings` 必须重启语言服务器**（命令面板 `editor: restart language server`）。「改完立即生效」要等服务端支持 `workspace/configuration`（PLAN Z-P3-1）。
+
+`initialization_options` 仍是**优先级最高的逃生口**（同名键会覆盖 `settings`），用法不变：
 
 ```jsonc
 {
@@ -210,8 +223,6 @@ tiptop version
   } }
 }
 ```
-
-`initialization_options` **只在启动时下发一次**，改完必须重启语言服务器（命令面板 `editor: restart language server`）。P3（Z-P3-1）之后才谈「改完立即生效」；该项在 `PLAN.md` 里现标为 ⚠️ 待确认——不做也能工作，只是改设置必须重启。
 
 **语言名必须与 `extension.toml` 完全一致**：`"Genero BDL"` 与 `"Genero Form"`；
 写成 `"4gl"` 会让该语言下的 `semantic_tokens` / `code_lens` 不生效。
@@ -235,7 +246,7 @@ bdl-lsp check -q <文件...>                         # 只列有问题的文件
 
 ---
 
-## 2. 项目初始化（从生产服务器拉取代码） [🔧 计划中·P1]
+## 2. 项目初始化（从生产服务器拉取代码） [✅ 0.2.0 已落地（Zed 配置生成）/ 🔧 计划中·P1（拉代码 task 需自备脚本）]
 
 **目标**：把生产端（默认 `/u1/topprod`）下的 `*.4gl` / `*.per` / `*.global` 拉到本地，变成带 git 的工程。
 
@@ -284,19 +295,32 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\init-project\init-pr
 > 📷 待补：初始化脚本的交互提问（选脚本 / SSH 目标 / 生产根 / 编码）（docs/images/zed/06-init-project-prompt.png）
 > 🎬 待补：从生产服务器拉取代码的完整过程与进度输出（docs/images/zed/07-init-project-run.mp4）
 
-### 2.2 初始化后生成的 Zed 配置 [🔧 计划中·P1]
+### 2.2 初始化后生成的 Zed 配置 [✅ 0.2.0 已落地（生成脚本已入库）]
 
-`4gl: 初始化 Zed 工程（生成 .zed 配置）` 这个 task 会跑交互式脚本（`scripts/zed/init-workspace.sh` / `init-workspace.ps1`，Z-P1-2），在终端里提问主机/账号/区号/命令模板，然后生成：
+生成脚本已随仓库提供：**`scripts/zed/init-workspace.sh`**（bash 3.2+，Linux / macOS / WSL）与 **`scripts/zed/init-workspace.ps1`**（PowerShell 5.1+，Windows），两者行为等价：在终端里交互提问（4 组：二进制路径 → Oracle 连接 → 生产环境 → init-project 脚本路径），然后生成三件套。脚本自己**不在**生成的 tasks.json 里，想一键重跑要先把它拷进项目：
 
-| 文件 | 内容 | 是否提交 git |
-|---|---|---|
-| `.zed/settings.json` | §1.3 的配置（含 `ext.prod.*`） | ⚠️ 含主机/账号，**建议不进 git**（生产环境只写 Workspace 级） |
-| `.zed/tasks.json` | §8.4 的 task 模板，参数按你的回答填好 | 可以提交（不含密码） |
-| `.zed/bdl-tool.json` | 扩展自用值的落盘（主机/区号/命令模板），供 task 与脚本引用 | 可以提交（不含密码） |
+```bash
+mkdir -p .zed/bdl && cp -r <zed-bdl 仓库>/scripts/zed/* .zed/bdl/
+bash .zed/bdl/init-workspace.sh          # 交互提问；每项回车即用默认值
+```
+
+> Windows：仓库同时提供 **`scripts/zed/init-workspace.ps1`**（PowerShell 5.1+，行为与 bash 版等价）：
+> `pwsh -File .zed\bdl\init-workspace.ps1`（本沙箱无 `pwsh`，该版本**未实跑**，仅做静态审阅；
+> CI 在 ubuntu runner 上会实跑，见 `tests/verify-init-script.py`）。
+
+生成结果与行为：
+
+| 文件 | 内容 | 已存在时 | 是否提交 git |
+|---|---|---|---|
+| `.zed/settings.json` | §1.3 的配置（含 `ext.prod.*`） | **不覆盖**，建议内容写到 `.zed/settings.json.bdl-new`（脚本提示手工合并） | ⚠️ 含主机/账号，**建议不进 git**（生产环境只写 Workspace 级） |
+| `.zed/tasks.json` | §8.4 的 task 模板，参数按你的回答填好 | 先备份为 `.zed/tasks.json.bak`（已存在则加时间戳）再写 | 可以提交（不含密码） |
+| `.zed/bdl-tool.json` | 本次输入值的记录（主机/区号/二进制路径/命令模板） | 直接覆盖 | 可以提交（不含密码） |
+
+脚本最多写出 **21 条 `4gl:` task**：20 条固定（链接资料 5 条、字段资料 3 条、上传/预演/下载 3 条、4GL/Form 执行 6 条、部署 3 条）+ 1 条可选的「初始化项目（从生产服务器拉取代码）」（仅当第 4 组填了 init-project 脚本路径时追加）。**脚本绝不询问、也绝不写入密码**；密码仍走 `.project/secrets.json` 或 `BDL_ORA_PASSWORD`。
 
 **为什么要有 `bdl-tool.json`**：task **读不到 Zed 设置**，无法把 `ext.prod.deploy.host` 插进命令行，所以生成脚本必须把值**写进文件**（或写进 task 的 `args`）；脚本还会提醒你把 `.zed/settings.json` 与 `.project/secrets.json` 加进 `.gitignore`。
 
-P1 之前的做法：手工把 §1.3 的配置贴进 `.zed/settings.json`，按 §8.4 手工建 `.zed/tasks.json`。
+也可以不用脚本：手工把 §1.3 的配置贴进 `.zed/settings.json`，按 §8.4 手工建 `.zed/tasks.json`。
 
 > 📷 待补：生成后的 .zed/settings.json、tasks.json、bdl-tool.json 三件套（docs/images/zed/08-zed-config-generated.png）
 
@@ -404,7 +428,7 @@ $env:BDL_ORA_PASSWORD = "<密码>"     # Windows：跳过权限校验；用环�
 
 ---
 
-## 4. 数据库字段资料 [✅ 当前可用 / 🔧 计划中·P1]
+## 4. 数据库字段资料 [✅ 当前可用 / ✅ 0.2.0 已落地（slash command）]
 
 字段资料回答**这一列的中文说明、类型、长度是什么**，并支撑 `RECORD LIKE t.*` 成员校验与列补全。写侧在 `tiptop`，产物 `<项目>/.project/schema/`（注意**没有点号**；旧布局 `.project/.schema` 只读兼容）：
 
@@ -451,9 +475,9 @@ DBA 侧导出 SQL 模板见 `vscode-extension/README.md` §3.1（字段名不要
 > 📷 待补：`tiptop schema status` 输出（表数 / 列数 / 导入时间 / 来源）（docs/images/zed/13-schema-status.png）
 > 🎬 待补：`schema sync -batch-size 200` 分批进度（解析阶段带「第 N 个/共 M 个」）（docs/images/zed/14-schema-sync-batch.mp4）
 
-### 4.2 在 Zed 里查看字段说明 [✅ 当前可用（读资料）/ 🔧 需先让设置生效]
+### 4.2 在 Zed 里查看字段说明 [✅ 0.2.0 已落地（设置生效）/ ✅ 当前可用（读资料）]
 
-这一节由 `bdl-lsp` 提供，Zed 侧同样生效。注意 §1.3 的现状：0.1.1 下只用 `settings` 写 `link.mode` / `schema.mode` 服务端**收不到**；今天即使什么都不写，服务端也会兜底「启用」并去读 `.project/` 资料，所以**只要采了资料就能看到说明**。
+这一节由 `bdl-lsp` 提供，Zed 侧同样生效。0.2.0 起 `lsp.bdl-lsp.settings` 会合并下发（§1.3），所以**直接写 `link.mode` / `schema.mode` 即可**；默认是**轻量档**（扩展在未显式配置时补 `mode:"off"`），要用资料得改成 `"file"`（CSV 导入）或 `"db"`（直连采集）。**改完必须重启语言服务器**；只要采了资料且 mode 打开，就能看到说明。
 
 | 能力 | 触发 | 说明 |
 |---|---|---|
@@ -472,18 +496,18 @@ DBA 侧导出 SQL 模板见 `vscode-extension/README.md` §3.1（字段名不要
 > 📷 待补：`DEFINE x LIKE t.col` 悬停显示类型与中文说明（docs/images/zed/15-hover-column.png）
 > 📷 待补：`RECORD LIKE t.*` 悬停展开字段（超 20 行折叠）（docs/images/zed/16-record-like.png）
 
-### 4.3 表清单 / 列清单 [🔧 计划中·P1（slash command）/ ❌ 无树视图]
+### 4.3 表清单 / 列清单 [✅ 0.2.0 已落地（slash command）/ ❌ 无树视图]
 
-计划（Z-P1-1）两条**只读** slash command，只读 `.project/schema/tables.json` 与 `.project/schema/tables/<大写表名>.json`，**不写盘**：
+两条**只读** slash command 已随 0.2.0 提供（Z-P1-1），只读 `.project/schema/tables.json` 与 `.project/schema/tables/<大写表名>.json`，**不写盘**：
 
-- `/bdl-schema-tables [正则]` —— 列表面（过滤表名，**大小写不敏感**）；
-- `/bdl-schema-columns <表名>` —— 列出该表列清单（名称 / 说明 / 类型 / 长度）。
+- `/bdl-schema-tables [过滤]` —— 列表面（表名过滤是**大小写不敏感子串**，额外支持 `^前缀` 与 `后缀$` 两种锚点；**不是完整正则**，与 VSCode 树视图不同）；一次最多列 **200 行**，超出会提示加过滤收窄；
+- `/bdl-schema-columns <表名>` —— 列出该表列清单（名称 / 类型(长度) / NULL / 说明），表名大小写不敏感（内部转大写）。
 
 Zed **无侧边栏树视图**（永久差异，§9），VSCode 的四个动作落点如下：
 
 | VSCode 动作 | Zed 替代 |
 |---|---|
-| 正则过滤表名 | `/bdl-schema-tables <正则>` 的参数 |
+| 正则过滤表名 | `/bdl-schema-tables <子串>` 的参数（`^` / `$` 锚点，非完整正则） |
 | 勾选 / 全选 / 清除勾选 | 无对应 UI；批量同步用 task 的 `-tables` / `-tables-file` |
 | 同步选中的表 | task：`tiptop schema sync … -tables a,b` 或 `-tables-file tables.txt` |
 | 复制列定义 | 用 `/bdl-schema-columns <表>` 拿文本后自行复制 |
@@ -497,20 +521,20 @@ Zed **无侧边栏树视图**（永久差异，§9），VSCode 的四个动作�
 这一组操作全部由 `tiptop` 在**生产端**执行，Zed 只负责把命令发出去。
 **插件不自动上传**：编译/链接/预览前请自己先上传，或确认生产端已是最新。
 
-### 5.1 总开关与前置 [🔧 计划中·P0/P1（开关映射）/ ✅ 命令本身可用]
+### 5.1 总开关与前置 [✅ 0.2.0 已落地（配置键写法）/ ❌ 无命令显隐门控（Zed 无命令注册 API）]
 
-VSCode 用 `bdl.deploy.enable` / `bdl.build.enable` 门控命令显隐，Zed 映射成 `ext` 下的同名语义：
+VSCode 用 `bdl.deploy.enable` / `bdl.build.enable` 门控命令显隐；Zed 把同名语义收在 `ext` 下（**只作为配置记录，扩展与 task 都不读它** —— Zed 无法把按钮显隐映射成命令门控）：
 
 | VSCode 设置 | Zed 设置（`settings.ext.*`） | 默认 | 作用 |
 |---|---|---|---|
-| `bdl.deploy.enable` | `ext.deploy.enable` | `false` | 上传/下载总开关（两者**共用**） |
-| `bdl.prod.deploy.transport` | `ext.prod.deploy.transport` | `off` | 上传方式 `off \| rsync \| scp`；`off` 等于关闭上传 |
-| `bdl.build.enable` | `ext.build.enable` | `false` | 编译 / 链接 / 预览总开关 |
+| `bdl.deploy.enable` | `ext.deploy.enable` | `false` | 仅作记录（不读）；真正是否上传由你跑不跑 task 决定 |
+| `bdl.prod.deploy.transport` | `ext.prod.deploy.transport` | `off` | 仅作记录（不读）：真正用哪种传输由 `.project/deploy/deploy.json` 的 `upload.mode` 决定 |
+| `bdl.build.enable` | `ext.build.enable` | `false` | 仅作记录（不读）；命令模板以 `.zed/tasks.json` 为准 |
 | `bdl.prod.deploy.host/port/user` | `ext.prod.deploy.host/port/user` | `22`，其余空 | SSH 主机/端口/账号（**只支持密钥**） |
 | `bdl.prod.deploy.region` | `ext.prod.deploy.region` | `1` | 登录后要输入的「区」 |
 | `bdl.prod.deploy.remoteRoot` / `localRoot` | `ext.prod.deploy.remoteRoot` / `localRoot` | 空 / `.` | 生产根与本地根 |
 | `bdl.prod.oracle.*` / `bdl.schema.batchSize` / `timeoutSec` | `ext.prod.oracle.*` / `ext.schema.batchSize` / `timeoutSec` | `1521`，其余空 / `200` / `120` | 直连采集的 Oracle 连接；字段资料分批参数 |
-| `bdl.tools.path` | `ext.tools.path` | 空 | `tiptop` 路径覆盖（P0 起生效） |
+| `bdl.tools.path` | `ext.tools.path` | 空 | `tiptop` 路径覆盖（0.2.0 起生效） |
 | `bdl.server.path` | `lsp.bdl-lsp.binary.path`（**Zed 原生键**） | 空 | `bdl-lsp` 路径覆盖 |
 
 **「区」的含义**（只影响编译/链接/预览）：登录后**先输入区号**，再 `source` 对应环境脚本，最后 `cd` 到生产根执行：
@@ -543,6 +567,7 @@ tiptop download -workspace . -file aap/4gl/x.4gl -dry-run
 - `-file` **必须相对路径**：绝对路径、盘符、`..` 越界都会被拒绝（路径安全）。
 - 下载是**覆盖写**，`tiptop` 自身**不备份也不询问**；Zed 侧没有差异确认弹窗（无 API），**下载前请自己 `git status` 或先提交**。
 - 上传/下载与 `tiptop deploy` 用**同一份配置** `.project/deploy/deploy.json`；上传前 task 里加 `"save": "current"`，否则传的是磁盘旧内容。
+- ⚠️ **Zed 侧没有"从设置合成 deploy.json"这一步**：VSCode 插件会按 `bdl.prod.deploy.*` 自动写 `.project/deploy/deploy.json`（`deployconfig.ts` 的 `ensureDeployConfig`），Zed 目前**需要你手写这份文件**（或者用 `tiptop deploy -config <文件>` 指定别处的配置）。`settings.ext.prod.deploy.*` 只是记录，**没有一个消费者**——已登记为 PLAN Z-P2-4（生成脚本/扩展合成 deploy.json）。手写样例见 §5.4。
 
 > 📷 待补：task 里「上传当前文件」的执行输出（含 rsync/scp 明细）（docs/images/zed/18-upload-task.png）
 
@@ -562,6 +587,10 @@ tiptop exec -command 'cd aap/4gl && r.c2 x' -dry-run                  # 只打�
 **退出码 = 远程退出码**。
 
 模板占位符（模板可改，分隔符**恒为 `/`**）：`${path}`（两层，如 `aap/4gl`）、`${fullpath}`（三层）、`${name}`（去扩展名）、`${fullname}`（含扩展名）。默认模板（`ext.build.*`）：
+
+> ⚠️ **Zed 侧 `ext.build.*` 目前不生效**：task 读不到 Zed 设置，生成脚本用的是内置默认模板；
+> 也就是说 Zed 上"有效的模板"是 **`.zed/tasks.json` 里各 task 的 `-command`**（改那里即可生效）。
+> `ext.build.*` 暂时只是配置记录（PLAN Z-P2-4 会让生成脚本读它）。
 
 ```text
 4gl.preview   cd ${path} && r.c2 ${name}
@@ -596,6 +625,35 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 配置模型 `.project/deploy/deploy.json`（旧 `.bdl-lsp/deploy.json` 只读兼容）：`targets.<名>.{host,port,user,remoteRoot,localRoot,upload{include,exclude,mode,rsyncArgs,fallback,delete},compile{4gl,per},strictHostKey,connectTimeout}` + `defaultTarget`，例如 `"compile": { "4gl": "fglcomp -M {file}", "per": "fglform {file}" }`。认证用 SSH key / ssh-agent，**不支持在配置里存密码**；`{file}` 在 `compile.*` 里替换为**远端路径**。
 
+**可直接改成自己环境的最小样例**（Zed 侧要手写；字段名写错会直接报错，因为解析用 `DisallowUnknownFields`）：
+
+```jsonc
+// <项目根>/.project/deploy/deploy.json
+{
+  "defaultTarget": "prod",
+  "targets": {
+    "prod": {
+      "host": "10.0.0.10",
+      "port": 22,
+      "user": "appuser",
+      "remoteRoot": "/u1/topprod",   // 必须是绝对路径
+      "localRoot": ".",
+      "strictHostKey": true,
+      "upload": {
+        "mode": "rsync",              // off | rsync | scp
+        "fallback": "scp",
+        "include": ["**/*.4gl", "**/*.per"],
+        "rsyncArgs": ["-az"]
+      },
+      "compile": {
+        "4gl": "fglcomp -M {file}",   // {file} = 远端路径，必填
+        "per": "fglform {file}"
+      }
+    }
+  }
+}
+```
+
 > 📷 待补：`tiptop deploy -dry-run` 的计划输出（docs/images/zed/20-deploy-dry-run.png）
 
 ### 5.5 编译结果与日志 [❌ 平台不支持（Problems 注入）/ ⬇️ 降级替代]
@@ -617,11 +675,11 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 ---
 
-## 6. 编辑与导航 [✅ 当前可用 / 🔧 计划中·P0（语义高亮）]
+## 6. 编辑与导航 [✅ 当前可用 / ⚠️ 待实机核实（语义高亮着色）]
 
 ### 6.1 高亮 / outline / 括号 / 缩进 / SQL 注入 [✅ 当前可用]
 
-全部由 tree-sitter query 实现（`languages/bdl/` 与 `languages/per/`，共 10 个 `.scm`），不在 Rust 侧、也不在 `bdl-lsp` 侧：
+全部由 tree-sitter query 实现（`languages/bdl/` 与 `languages/per/`，共 9 个 `.scm`），不在 Rust 侧、也不在 `bdl-lsp` 侧：
 
 | 能力 | 说明 |
 |---|---|
@@ -666,11 +724,11 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 > 📷 待补：`.4gl` 格式化前后对比（docs/images/zed/24-format.png）
 
-### 6.4 语义高亮 [🔧 计划中·P0（缺扩展级规则文件）/ ✅ 宿主开关可用]
+### 6.4 语义高亮 [✅ 0.2.0 已提供扩展规则 / ⚠️ 待实机核实（着色效果）]
 
-现状：`bdl-lsp` 已发 `semanticTokens/full`，但 ① **Zed 默认 `semantic_tokens: "off"`**；② 本扩展**还缺** `languages/bdl/semantic_token_rules.json` 与 `languages/per/semantic_token_rules.json`（**P0 交付物，Z-P0-4**）。Zed 的扩展级规则优先级为「用户规则 > 扩展规则 > Zed 内置」。
+现状：`bdl-lsp` 已发 `semanticTokens/full`；本扩展的 `languages/bdl/semantic_token_rules.json` 与 `languages/per/semantic_token_rules.json` 也已随 **0.2.0** 提供（各 **8 条**规则，Z-P0-4），按 `bdl-lsp` 的 legend 写、带主题回退（每条 `style` 给多个候选）。① **Zed 默认 `semantic_tokens: "off"`**，要显式打开；② Zed 的扩展级规则优先级为「用户规则 > 扩展规则 > Zed 内置」。**规则已就位，但着色效果仍为 ⚠️ 待实机核实。**
 
-服务端口径：只发**用户自定义符号**（关键字/字符串交给 TextMate/tree-sitter 着色）；函数 `declaration`、常量 `readonly`、GLOBALS 块 `static`。计划按 `bdl-lsp` 的 legend 写规则文件：`variable` / `parameter` / `function` / `struct` / `property` / `keyword`。
+服务端口径：只发**用户自定义符号**（关键字/字符串交给 TextMate/tree-sitter 着色）；函数 `declaration`、常量 `readonly`、GLOBALS 块 `static`。规则文件覆盖 legend：`variable` / `parameter` / `function` / `struct` / `property` / `keyword`，以及 `readonly` / `static` 两个修饰符。
 
 ```jsonc
 { "languages": { "Genero BDL": { "semantic_tokens": "combined" }, "Genero Form": { "semantic_tokens": "combined" } } }
@@ -739,7 +797,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 }
 ```
 
-> 0.1.1 生效提示见 §1.3：今天请把这段放进 `lsp.bdl-lsp.initialization_options` 并重启语言服务器。
+> 0.2.0 生效提示见 §1.3：这段直接写在 `lsp.bdl-lsp.settings` 里即可；**改完必须重启语言服务器**（生效配置只在启动时下发一次）。
 
 > 📷 待补：编辑器里出现诊断（含级别颜色）与诊断列表（docs/images/zed/28-diagnostics.png）
 
@@ -776,12 +834,12 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 ---
 
-## 8. 设置参考 [✅ 当前可用 / 🔧 计划中·P0（生效性）]
+## 8. 设置参考 [✅ 当前可用 / 🔧 计划中·P3（热更新）]
 
-### 8.1 Zed 设置总表 [✅ 写法 / 🔧 计划中·P0（生效性）]
+### 8.1 Zed 设置总表 [✅ 0.2.0 已落地（生效性）/ ✅ 写法]
 
 位置：`lsp.bdl-lsp.settings`（`.zed/settings.json` 或全局 `settings.json`）。
-**0.1.1 提醒**：这些键**尚不能到达服务端**，请同时用 `initialization_options`（§1.3）；P0 之后直接写这里即可。
+**0.2.0 提醒**：这些键会被扩展合并后从 `initializationOptions` 下发（去掉 `ext`、补轻量档默认），**直接写这里即可**；`initialization_options` 仍是优先级最高的逃生口（§1.3）。**改完必须重启语言服务器**（热更新见 P3 / Z-P3-1）。
 
 **① 下发给 `bdl-lsp` 的键**（与 `internal/config.Settings` 同名，**无 `bdl.` 前缀**）：
 
@@ -802,12 +860,12 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 | 键 | 类型 | 默认值 | 一句说明 |
 |---|---|---|---|
-| `ext.tools.path` | string | `""` | `tiptop` 路径覆盖（P0 起生效）；不写则按 `TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/` → `PATH` 找 |
+| `ext.tools.path` | string | `""` | `tiptop` 路径覆盖（0.2.0 起生效）；不写则按 `TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/` → `PATH` 找 |
 | `ext.schema.batchSize` / `timeoutSec` | int | `200` / `120` | `schema sync` 分批大小（`0` = 不分批）与每批超时（秒） |
 | `ext.prod.oracle.host` / `port` / `service` / `user` | string/int | `1521`，其余空 | 直连采集的 Oracle 连接（**不放密码**） |
 | `ext.prod.deploy.host` / `port` / `user` / `region` / `strictHostKey` | string/int/bool | `22` / `"1"` / `true`，其余空 | SSH 主机/端口/账号（**只支持密钥**）；登录后要输入的区（`1` topprod / `2` toptest / `3` topstd / `4` Browser-based）；严格主机密钥校验 |
 | `ext.prod.deploy.transport` / `localRoot` / `remoteRoot` | string | `"off"` / `"."` / `""` | 上传方式（`off \| rsync \| scp`，`off` = 关闭上传）、本地根、生产根 |
-| `ext.deploy.enable` / `ext.build.enable` | bool | `false` | 上传/下载总开关（两者共用）；编译 / 链接 / 预览总开关 |
+| `ext.deploy.enable` / `ext.build.enable` | bool | `false` | 仅作配置记录（**扩展与 task 都不读**，Zed 也没有按钮显隐）；是否跑 task 由你自己决定 |
 | `ext.build.4gl.preview` / `compile` / `link` | string | 见 §5.3 默认模板 | 4GL 三条命令模板 |
 | `ext.build.per.preview` / `compile` / `form` | string | 见 §5.3 默认模板 | Form 三条命令模板 |
 | `ext.download.bdlLsp` | string | `"auto"` | `bdl-lsp` 自动下载 `auto \| off`（P4） |
@@ -849,13 +907,13 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | 变量 | 谁读 | 作用 |
 |---|---|---|
 | `BDL_LSP_PATH` | **Zed 扩展**（`src/lib.rs`） | `bdl-lsp` 路径（第 2 优先级）；文件不存在会直接报错 |
-| `TIPTOP_PATH` | **Zed 扩展**（🔧 计划中·P0，Z-P0-5） | `tiptop` 路径（第 2 优先级）；今天请用 `PATH` 或 task 绝对路径 |
+| `TIPTOP_PATH` | **Zed 扩展**（✅ 0.2.0 已落地，Z-P0-5） | `tiptop` 路径（第 2 优先级）；不写则由工作区 `.bdl-lsp/bin/` 或 `PATH` 兜底。**task 读不到 Zed 设置**，task 里仍需 `PATH` 或绝对路径（§8.4） |
 | `BDL_ORA_PASSWORD` | **`tiptop`** | Oracle 密码；优先级高于 `.project/secrets.json` |
 
 > ⚠️ **`bdl-lsp` 服务端不读任何环境变量**；`BDL_LSP_PATH` 是**客户端侧**（扩展）约定，只影响"去哪找可执行文件"。
 > ⚠️ task 继承 **Zed 启动时**的环境；外部改了环境变量需重启 Zed 才可见。
 
-### 8.4 task 模板总表与 keymap 绑定 [✅ 当前可用（模板可手工建）/ 🔧 计划中·P1（生成脚本）]
+### 8.4 task 模板总表与 keymap 绑定 [✅ 0.2.0 已落地（生成脚本）/ ✅ 当前可用（模板可手工建）]
 
 用 `"command": "tiptop"` + `"args": [...]` + `"cwd": "$ZED_WORKTREE_ROOT"`，或 `"command": "bdl-lsp"`；`"save": "current"` 用于上传前保存脏文档。
 **变量**：`$ZED_FILE`（绝对路径）、`$ZED_RELATIVE_FILE`（相对工作区根）、`$ZED_RELATIVE_DIR`、
@@ -865,14 +923,14 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 | label | 命令要点 | 阶段 |
 |---|---|---|
-| `4gl: 初始化 Zed 工程（生成 .zed 配置）` | 交互式脚本，生成 `.zed/settings.json` / `.zed/tasks.json` / `.zed/bdl-tool.json`（含 `.gitignore` 提示） | P1 |
-| `4gl: 初始化项目（从生产服务器拉取代码）` | 调 `scripts/init-project/` 同款脚本（Linux/WSL→bash，Windows→PowerShell），终端里跑、可交互输入密码 | P1 |
+| `4gl: 初始化 Zed 工程（生成 .zed 配置）` | 交互式脚本 `scripts/zed/init-workspace.sh`，生成 `.zed/settings.json` / `.zed/tasks.json` / `.zed/bdl-tool.json`（含 `.gitignore` 提示） | ✅ 0.2.0（脚本已入库；这条 task 需按 §2.2 手工加） |
+| `4gl: 初始化项目（从生产服务器拉取代码）` | 调 init-project 脚本（Linux/WSL→bash，Windows→PowerShell），终端里跑、可交互输入密码 | ✅ 0.2.0（生成脚本可挂载；init-project 脚本需自备） |
 | `4gl: 链接资料：查看状态` | `tiptop link status -root $ZED_WORKTREE_ROOT` | ✅ 当前可用 |
 | `4gl: 链接资料：从 CSV 导入` | `tiptop link import -csv <CSV> -root $ZED_WORKTREE_ROOT`（CSV 路径用交互脚本或参数填入） | ✅ 当前可用 |
 | `4gl: 链接资料：全量更新` | `tiptop link sync -root $ZED_WORKTREE_ROOT -source golang -host … -port … -service … -user …` | ✅ 当前可用 |
 | `4gl: 链接资料：按模组更新` | 同上追加 `-modules <m1,m2>` | ✅ 当前可用 |
 | `4gl: 链接资料：更新当前文件` | 同上追加 `-files $ZED_RELATIVE_FILE` | ✅ 当前可用 |
-| `4gl: 链接关系（终端清单）` | 打印 MAIN 与链内子文件的路径清单（Code Lens 的替代） | P1/P2 |
+| `4gl: 链接关系（终端清单）` | 打印 MAIN 与链内子文件的路径清单（Code Lens 的替代） | 🔧 计划中·P2 |
 | `4gl: 字段资料：查看状态` | `tiptop schema status -root $ZED_WORKTREE_ROOT` | ✅ 当前可用 |
 | `4gl: 字段资料：从 CSV 导入` | `tiptop schema import -csv <CSV> -root $ZED_WORKTREE_ROOT` | ✅ 当前可用 |
 | `4gl: 字段资料：从数据库同步` | `tiptop schema sync -root $ZED_WORKTREE_ROOT -source golang -host … -service … -user … -batch-size 200 -timeout 120` | ✅ 当前可用 |
@@ -883,7 +941,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | `4gl: Form 预演编译 / 编译 / 预览画面` | 同上 | ✅ 当前可用 |
 | `4gl: 部署预演 / 列出目标` | `tiptop deploy -dry-run` / `tiptop deploy -list` | ✅ 当前可用 |
 
-可直接复制的 `.zed/tasks.json`（把 `<Oracle主机>` 等占位符换成实际值；或等 P1 生成脚本）：
+可直接复制的 `.zed/tasks.json`（把 `<Oracle主机>` 等占位符换成实际值；或用 `scripts/zed/init-workspace.sh` 自动生成，§2.2）：
 
 ```jsonc
 [
@@ -928,7 +986,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 ]
 ```
 
-> **提示**：`-command` 里的目录**最稳是写死**（如 `cd aap/4gl && r.c2 $ZED_STEM`）；若想按当前文件自动取目录需 shell 展开（`cd $(dirname $ZED_RELATIVE_FILE) && …`），对空格与平台差异更敏感；P1 的生成脚本会按文件路径生成一条 task。
+> **提示**：`-command` 里的目录**最稳是写死**（如 `cd aap/4gl && r.c2 $ZED_STEM`）；按当前文件自动取目录请用 Zed 变量 `$ZED_RELATIVE_DIR`（如 `cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM`），**不要写 VSCode 的 `${path}` / `${name}` / `${fullname}`** —— Zed 会把 `$…` 当成自己的 task 变量，未知变量会让整条 task 从 `task: spawn` 列表消失。生成脚本（`scripts/zed/init-workspace.sh`）写出的 exec task 就用 `$ZED_RELATIVE_DIR` / `$ZED_STEM` / `$ZED_FILENAME`。
 
 **取消上一次**：`"use_new_terminal": false` + `"allow_concurrent_runs": true`，重跑即取消上一次。
 
@@ -947,20 +1005,22 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 > 📷 待补：keymap 绑定后按快捷键触发 task（docs/images/zed/30-keymap-bound.png）
 
-### 8.5 slash command 总表 [🔧 计划中·P1（`/bdl-force-parse` 为 P3）]
+### 8.5 slash command 总表 [✅ 0.2.0 已落地（`/bdl-force-parse` 为 🔧 计划中·P3）]
 
-入口是 Zed 的 **Agent 面板**（slash command 只在 Agent 面板里可用，**不在命令面板**）。
+入口是 Zed 的 **Agent 面板**（slash command 只在 Agent 面板里可用，**不在命令面板**）。8 条命令的实现见 `src/slash.rs` + `src/project.rs`，声明在 `extension.toml` 的 `[slash_commands.*]`（`tests/verify-manifest.py` 静态校验一一对应）。
 
 | 名称 | 参数 | 做什么 | 阶段 |
 |---|---|---|---|
-| `/bdl-env-check` | 无 | 显示生效设置摘要、`bdl-lsp` / `tiptop` 版本与路径、资料目录状态 | P1 |
-| `/bdl-link-status` | 无 | 读 `.project/link/links.meta.json` + `links.jsonl`，统计链数 / 文件数 / 生成时间 / 局部更新 | P1 |
-| `/bdl-schema-status` | 无 | 读 `.project/schema/tables.json`，统计表数 / 列数 / 导入时间 / 来源 | P1 |
-| `/bdl-schema-tables` | 正则（可空） | 列表面（过滤表名，**大小写不敏感**） | P1 |
-| `/bdl-schema-columns` | 表名 | 列出该表列清单（名称 / 说明 / 类型 / 长度） | P1 |
-| `/bdl-deploy-list` | 无 | `tiptop deploy -list`，列出部署目标 | P1 |
-| `/bdl-deploy-dry-run` | 无 | `tiptop deploy -dry-run -json`，只打印计划 | P1 |
-| `/bdl-force-parse` | 无 | 强制解析当前文件（**需服务端 `executeCommand`**） | P3 |
+| `/bdl-env-check` | 无 | 显示生效设置摘要（链接/字段 mode、dataDir、Genero 版本、日志级别）、两个二进制的路径与版本（实跑 `version`）、资料文件是否存在，并打印生效配置原文 | ✅ 0.2.0 |
+| `/bdl-link-status` | 无 | 读 `.project/link/links.meta.json` + `links.jsonl`，显示链 / orphan / ambiguous / 缺失文件 / 生成时间 / 来源 / 局部更新 / 链内文件数；**没有资料时给的是引导文案，不是报错** | ✅ 0.2.0 |
+| `/bdl-schema-status` | 无 | 读 `.project/schema/tables.json`，显示表数 / 列数 / 导入时间 / 来源 / 原始行数 | ✅ 0.2.0 |
+| `/bdl-schema-tables` | 过滤子串 | 列表面（**大小写不敏感子串**，支持 `^前缀` / `后缀$` 锚点，**不是完整正则**，与 VSCode 树视图不同）；一次最多列 **200 行** | ✅ 0.2.0 |
+| `/bdl-schema-columns` | 表名 | 读 `.project/schema/tables/<大写表名>.json`，列出 名称 / 类型(长度) / NULL / 说明 | ✅ 0.2.0 |
+| `/bdl-deploy-list` | 无 | 实跑 `tiptop deploy --list`（自动补 `--workspace <项目根>`），列出部署目标 | ✅ 0.2.0 |
+| `/bdl-deploy-dry-run` | 无 | 实跑 `tiptop deploy --dry-run`（自动补 `--workspace <项目根>`），只打印计划 | ✅ 0.2.0 |
+| `/bdl-force-parse` | 无 | 强制解析当前文件；**当前只返回**「需要服务端 `workspace/executeCommand`（PLAN Z-P3-2）+ 三条替代办法」，**尚未可用** | 🔧 计划中·P3 |
+
+**capability**：`extension.toml` 已声明 `[[capabilities]]` —— `process:exec` × 7 个参数形状（`link` / `schema` / `upload` / `download` / `exec` / `deploy` / `version`，command 均为 `"*"`）+ `download_file`（`host = "github.com"`、`path = ["darcyjoven", "**"]`，给 P4 自动下载预留）。首次使用会弹授权；若你在 `granted_extension_capabilities` 里收紧了权限，需要放行**同样形状**，否则 slash command 会提示 capability 错误。
 
 **硬规则**：**会写盘的操作（采集 / 导入 / 同步 / 上传 / 下载 / 部署）不进 slash command**，只给 task；slash command 只做**只读查询**与**只打印的预演**——它就在 Agent 面板里，误触一次可能重算整份资料或覆盖生产文件。
 
@@ -972,17 +1032,17 @@ tiptop deploy -no-upload  -target prod                # 只编译
 
 同一个后端（`bdl-lsp` + `tiptop`）、同一套资料格式与命令参数；**差的全是编辑器容器能力**：`zed_extension_api 0.7.0`（兼容 Zed 0.205.x）里没有树视图、状态栏、输出面板、任意命令注册、诊断注入。
 
-| 能力 | VSCode（0.9.2） | Zed（0.1.1） | 说明 |
+| 能力 | VSCode（0.9.2） | Zed（0.2.0） | 说明 |
 |---|---|---|---|
 | 语法高亮 | ✅ TextMate | ✅ Tree-sitter | 已对齐（47 项 query 校验全绿） |
 | 语言智能（诊断/悬停/跳转/引用/补全/重命名/Code Action/格式化） | ✅ | ✅ | 同一个 `bdl-lsp`，行为一致 |
-| 语义高亮 | ✅ 默认开 | 🔧 默认 off + 缺规则文件 | 开 `"semantic_tokens": "combined"`；规则文件 P0 |
+| 语义高亮 | ✅ 默认开 | ✅ 0.2.0 已提供规则（默认 off；着色 ⚠️ 待实机核实） | 开 `"semantic_tokens": "combined"`；规则文件已随 0.2.0 提供 |
 | 诊断渲染位置 | Problems 面板 + 内联 | ✅ 宿主直接渲染（内联/诊断列表） | Zed 无独立 Problems 面板，但诊断可用 |
-| **配置是否生效** | ✅ | 🔧 0.1.1 未到达服务端 | P0 修（Z-P0-3）；期间用 `initialization_options` |
-| **轻量档默认** | ✅ 三开关默认 off | 🔧 0.1.1 服务端按「启用」兜底 | P0 修（Z-P0-3） |
+| **配置是否生效** | ✅ | ✅ 0.2.0 已到达服务端 | Z-P0-3 已修；改完**必须重启语言服务器** |
+| **轻量档默认** | ✅ 三开关默认 off | ✅ 0.2.0 扩展补 `mode:"off"` | Z-P0-3 已修，与 VSCode 轻量档对齐 |
 | 命令面板注册 | ✅ **33 条**命令 | ❌ **无命令注册 API** | ⬇️ task（写盘/长任务）+ slash command（只读） |
 | 侧边栏树视图（链接资料 / 数据库字段） | ✅ **2 个 TreeView** | ❌ **无树视图 API** | ⬇️ 链接用 **Code Lens 挂 MAIN**（P3）；字段用 slash 文本（P1） |
-| 树的操作（过滤/勾选/批量/复制列定义） | ✅ | ❌ 无 | ⬇️ 过滤=正则参数；批量=`-tables`/`-tables-file`；复制=抄文本 |
+| 树的操作（过滤/勾选/批量/复制列定义） | ✅ | ❌ 无 | ⬇️ 过滤=子串 + `^` / `$` 锚点参数；批量=`-tables`/`-tables-file`；复制=抄文本 |
 | 反查引用程序 | ✅ 视图 + 分页 | 🔧 函数级口径 | Zed 不做「引用程序 + 分页」视图 |
 | 局部查看链接关系 | ✅ Code Lens（VSCode 侧 P1-8） | 🔧 同一份服务端实现 | 两端共用一份 `textDocument/codeLens` |
 | 上传/下载 | ✅ 命令 + **右上角按钮** + 右键 | ✅ task | ⬇️ 按钮 → 命令面板 + keymap |
@@ -1029,7 +1089,7 @@ which bdl-lsp          # Windows: where bdl-lsp
 | 文件被忽略了吗 | `ignore.files` 命中会屏蔽该文件**所有**诊断 |
 | 文件太大 / 解析超时 | 会出现 `file-too-large` / `parse-timeout`，此时**跳过语法检查**（§7.2） |
 | 改完设置没重启 | `initialization_options` 只在启动时下发一次，**必须重启语言服务器** |
-| 0.1.1 的已知问题 | `settings` 里的键**今天到不了服务端**——这就是"改了没反应"的最常见原因（§1.3） |
+| 0.2.0 起生效 | `settings` 会合并下发到服务端；若"改了没反应"，多半是**没重启语言服务器**（§1.3 / §10.7） |
 
 ### 10.3 函数全报「找不到定义」 [✅ 当前可用]
 
@@ -1052,7 +1112,7 @@ tiptop link sync -root . -source golang -host <主机> -service <服务名> -use
 
 - `bdl-lsp` **只读**资料并按 mtime 热重载（2 秒节流），正常情况下导入/同步后**不需要重启**。
 - 先确认**写对了目录**：默认 `.project/link/`；若改了 `link.dataDir`，`tiptop -out` 必须与之一致。
-- 旧目录 `.link/` 是**只读兼容**：`tiptop` 不往那儿写，但 `bdl-lsp` 会读（并给 `link-data-legacy-dir` 的 hint），所以"资料看着是旧的"很可能是**旧目录里还有一份**。迁移（P1 会提供 task；今天手工）：
+- 旧目录 `.link/` 是**只读兼容**：`tiptop` 不往那儿写，但 `bdl-lsp` 会读（并给 `link-data-legacy-dir` 的 hint），所以"资料看着是旧的"很可能是**旧目录里还有一份**。迁移 task 仍属 **🔧 计划中·P2（Z-P2-2）**，现在手工迁移：
 
 ```bash
 mkdir -p .project/link
@@ -1090,9 +1150,8 @@ tiptop link status -root .        # 看生成时间与天数、局部更新 part
 
 ### 10.7 设置不生效 [✅ 当前可用]
 
-1. **0.1.1 已知问题**：`lsp.bdl-lsp.settings` 的键**今天到不了服务端**（§1.3）。临时解：同样内容放
-   `lsp.bdl-lsp.initialization_options`，然后**重启语言服务器**。
-2. **改完没重启**：`initialization_options` 只在启动时下发一次；P3（Z-P3-1）之后才谈热更新。
+1. **生效路径（0.2.0）**：`lsp.bdl-lsp.settings` 的键会合并进 `initializationOptions` 下发（§1.3），**直接写这里即可**；`initialization_options` 仍是最高优先级逃生口。
+2. **改完没重启**：生效配置只在语言服务器启动时下发一次（含合并后的 `settings`），**改完必须重启语言服务器**。热更新要等服务端 `workspace/configuration`（P3 / Z-P3-1）。
 3. **写错位置**：扩展只能读 `lsp.<server>` 这一块（`lsp.bdl-lsp.*`），写别的分类读不到。
 4. **写错键名**：下发给 LSP 的键**没有 `bdl.` 前缀**；仅扩展自用的键必须在 `ext` 下。
 5. **语言名写错**：`languages` 下必须写 `"Genero BDL"` / `"Genero Form"`，写 `"4gl"` 无效。
@@ -1134,7 +1193,7 @@ tiptop link status -root .        # 看生成时间与天数、局部更新 part
 | 5 | 📷 | 第一次打开 `.4gl`（语言名、高亮、语言服务器运行中） | `05-first-open.png` | §1.4 |
 | 6 | 📷 | 初始化脚本的交互提问（选脚本 / SSH 目标 / 生产根 / 编码） | `06-init-project-prompt.png` | §2.1 |
 | 7 | 🎬 | 从生产服务器拉取代码的完整过程与进度 | `07-init-project-run.mp4` | §2.1 |
-| 8 | 📷 | 生成后的 `.zed/settings.json`、`tasks.json`、`bdl-tool.json` | `08-zed-config-generated.png` | §2.2（P1） |
+| 8 | 📷 | 生成后的 `.zed/settings.json`、`tasks.json`、`bdl-tool.json` | `08-zed-config-generated.png` | §2.2（✅ 0.2.0） |
 | 9 | 📷 | `tiptop link status` 的中文输出 | `09-link-status.png` | §3.1 |
 | 10 | 🎬 | `tiptop link sync` 全量采集的进度输出 | `10-link-sync-progress.mp4` | §3.1 |
 | 11 | 📷 | Code Lens 挂在 MAIN 上 | `11-code-lens-main.png` | §3.2（P3） |
@@ -1142,7 +1201,7 @@ tiptop link status -root .        # 看生成时间与天数、局部更新 part
 | 13 | 📷 | `tiptop schema status` 输出 | `13-schema-status.png` | §4.1 |
 | 14 | 🎬 | `schema sync -batch-size 200` 的分批进度 | `14-schema-sync-batch.mp4` | §4.1 |
 | 15–16 | 📷 | `DEFINE x LIKE t.col` 悬停显示类型与中文说明；`RECORD LIKE t.*` 悬停展开字段 | `15-hover-column.png`、`16-record-like.png` | §4.2 |
-| 17 | 📷 | `/bdl-schema-tables` 返回的表清单文本 | `17-slash-schema-tables.png` | §4.3（P1） |
+| 17 | 📷 | `/bdl-schema-tables` 返回的表清单文本 | `17-slash-schema-tables.png` | §4.3（✅ 0.2.0） |
 | 18 | 📷 | task 里「上传当前文件」的执行输出 | `18-upload-task.png` | §5.2 |
 | 19 | 📷 | `tiptop exec` 的编译输出 | `19-build-task.png` | §5.3 |
 | 20 | 📷 | `tiptop deploy -dry-run` 的计划输出 | `20-deploy-dry-run.png` | §5.4 |
@@ -1155,7 +1214,7 @@ tiptop link status -root .        # 看生成时间与天数、局部更新 part
 | 28 | 📷 | 编辑器里出现诊断（含级别颜色）与诊断列表 | `28-diagnostics.png` | §7.1 |
 | 29 | 📷 | 大文件被跳过时的 `file-too-large` 提示 | `29-file-too-large.png` | §7.2 |
 | 30 | 📷 | keymap 绑定后按快捷键触发 task | `30-keymap-bound.png` | §8.4 |
-| 31 | 📷 | Agent 面板里执行 `/bdl-schema-status` 与 `/bdl-env-check` | `31-slash-commands.png` | §8.5（P1） |
+| 31 | 📷 | Agent 面板里执行 `/bdl-schema-status` 与 `/bdl-env-check` | `31-slash-commands.png` | §8.5（✅ 0.2.0） |
 
 占位正文格式统一为：`> 📷 待补：<内容>（docs/images/zed/<建议文件名>）`
 
@@ -1167,11 +1226,12 @@ tiptop link status -root .        # 看生成时间与天数、局部更新 part
 
 **Zed 侧（本仓库）**
 
-- `zed-extension/extension.toml` —— 扩展 id `4gl-full`、版本 `0.1.1`、grammar `rev`、`[language_servers.bdl-lsp]` 与 language id 映射（`Genero BDL`→`bdl`，`Genero Form`→`per`）
-- `zed-extension/src/lib.rs` —— 二进制定位四级顺序、`~/` 展开、`initialization_options` / `workspace_configuration` 现状（§1.2 / §1.3 照此写）
+- `zed-extension/extension.toml` —— 扩展 id `4gl-full`、版本 `0.2.0`、grammar `rev`、`[language_servers.bdl-lsp]` 与 language id 映射（`Genero BDL`→`bdl`，`Genero Form`→`per`）、`[slash_commands.*]`（8 条）与 `[[capabilities]]` 声明
+- `zed-extension/src/`（`lib.rs` / `config.rs` / `binary.rs` / `project.rs` / `slash.rs`）—— 二进制定位四级顺序与 `~/` 展开（`binary.rs`）、三层配置合并与轻量档默认（`config.rs`）、资料只读渲染与表名过滤语法（`project.rs`）、slash command 分派与 capability 依赖（`slash.rs`）、`initialization_options` / `workspace_configuration` 下发（`lib.rs`）（§1.2 / §1.3 / §4.3 / §8.5 照此写）
 - `zed-extension/docs/PLAN.md` —— 基线、Zed 平台能力边界（§4.1–4.4）、差距矩阵与降级方案（§6 / §8）、阶段任务 P0–P5（§7）、实机验收清单（§11.2）、风险（§12）
 - `zed-extension/README.md` —— 能力一览、安装、配置示例、task/slash 列表（口径一致性核对）
 - `zed-extension/tests/verify-manifest.py`、`tests/verify-queries.mjs` —— §6.1 的清单/query 校验口径
+- `zed-extension/scripts/zed/init-workspace.sh` —— 生成的 `.zed` 三件套、最多 21 条 task 的 label/args、不覆盖 settings / 备份 tasks / 不写密码等行为（§2.2 / §8.4 照此写）
 
 **`bdl-lsp`（语言服务）**
 

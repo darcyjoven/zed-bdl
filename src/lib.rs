@@ -1,10 +1,12 @@
 //! Genero BDL / Form 的 Zed 扩展。
 //!
-//! 职责很窄：
+//! 职责：
 //! 1. 告诉 Zed 用哪个可执行文件启动 `bdl-lsp`（[`binary`]）；
-//! 2. 把用户的 Zed 设置合并成有效配置并从 `initializationOptions` 下发（[`config`]）。
+//! 2. 把用户的 Zed 设置合并成有效配置并从 `initializationOptions` 下发（[`config`]）；
+//! 3. 提供只读的 slash command（[`slash`]，Agent 面板 `/bdl-…`）。
 //!
-//! 语法高亮、outline、缩进是 `languages/*/` 的 query，不在 Rust 侧实现。
+//! 语法高亮、outline、缩进是 `languages/*/` 的 query，不在 Rust 侧实现；
+//! 写盘 / 长任务 / 需要交互的操作用项目 `.zed/tasks.json` 的 task（见 `docs/USER-GUIDE.md`）。
 //!
 //! ## 为什么配置不走 `settings` 通道（2026-10-28 核实）
 //!
@@ -16,6 +18,8 @@
 
 mod binary;
 mod config;
+mod project;
+mod slash;
 
 use zed_extension_api as zed;
 
@@ -58,6 +62,19 @@ impl zed::Extension for BdlExtension {
     ) -> zed::Result<Option<zed::serde_json::Value>> {
         let settings = config::load(worktree);
         Ok(Some(settings.lsp))
+    }
+
+    /// slash command：Agent 面板里输入 `/bdl-…`。
+    ///
+    /// 名字与 `extension.toml` 的 `[slash_commands.*]` 必须一一对应，
+    /// 由 `tests/verify-manifest.py` 静态校验。
+    fn run_slash_command(
+        &self,
+        command: zed::SlashCommand,
+        args: Vec<String>,
+        worktree: Option<&zed::Worktree>,
+    ) -> zed::Result<zed::SlashCommandOutput> {
+        slash::run(&command.name, &args, worktree)
     }
 }
 

@@ -27,3 +27,91 @@ languages = ["Genero BDL", "Genero Form"]
 [language_servers.bdl-lsp.language_ids]
 "Genero BDL" = "bdl"
 "Genero Form" = "per"
+
+# ---------------------------------------------------------------------------
+# Slash command（Agent 面板 `/bdl-…`）：只读短查询，名字必须与
+# src/slash.rs 的 SLASH_COMMANDS 一一对应（tests/verify-manifest.py 会静态校验）；
+# 写错时编译通过但命令静默不响应。
+# 会写盘 / 长任务 / 需要交互输入的操作一律走项目 `.zed/tasks.json` 的 task。
+
+[slash_commands.bdl-env-check]
+description = "4gl 环境自检：生效设置、bdl-lsp/tiptop 路径与版本、资料状态"
+requires_argument = false
+
+[slash_commands.bdl-link-status]
+description = "链接资料状态：链数 / orphan / ambiguous / 缺失文件 / 生成时间 / 局部更新"
+requires_argument = false
+
+[slash_commands.bdl-schema-status]
+description = "字段资料状态：表数 / 列数 / 导入时间 / 来源"
+requires_argument = false
+
+[slash_commands.bdl-schema-tables]
+description = "列出表清单（可选参数：大小写不敏感子串，支持 ^前缀 与 后缀$；不填=全部）"
+requires_argument = false
+
+[slash_commands.bdl-schema-columns]
+description = "列出某张表的列（参数：表名）"
+requires_argument = true
+
+[slash_commands.bdl-deploy-list]
+description = "列出部署目标（tiptop deploy -list）"
+requires_argument = false
+
+[slash_commands.bdl-deploy-dry-run]
+description = "部署预演，只打印计划（tiptop deploy -dry-run）"
+requires_argument = false
+
+[slash_commands.bdl-force-parse]
+description = "强制解析当前文件（需服务端 workspace/executeCommand，PLAN Z-P3-2 后可用）"
+requires_argument = false
+
+# ---------------------------------------------------------------------------
+# capability 声明（Zed 0.205+ 校验；旧版本忽略未知字段，不会导致加载失败）。
+#
+# 为什么 command 写 "*"：Zed 的 `process::Command` 没有 cwd，扩展必须用
+# **绝对路径**调用 tiptop，而 capability 的 command 是精确匹配（或 "*"）。
+# 因此用 "*" + 参数形状把范围收窄到 tiptop 的子命令形状。
+# 用户若收紧了 `granted_extension_capabilities`，需要放行同样形状。
+
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["link", "**"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["schema", "**"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["upload", "**"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["download", "**"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["exec", "**"]
+
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["deploy", "**"]
+
+# bdl-lsp version / tiptop version（`/bdl-env-check` 探测版本用）
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["version"]
+
+# 运行时自动下载二进制（PLAN Z-P4-1 / Z-P4-2 使用）
+[[capabilities]]
+kind = "download_file"
+host = "github.com"
+path = ["darcyjoven", "**"]

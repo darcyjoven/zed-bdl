@@ -61,7 +61,6 @@ impl Settings {
     }
 
     /// 按路径读 `ext` 里的字符串（如 `["tools","path"]`）。
-    #[allow(dead_code)] // P1 的 slash command / task 生成脚本用，见 PLAN Z-P1-1
     pub fn ext_str(&self, path: &[&str]) -> Option<String> {
         let mut cur = &self.ext;
         for key in path {

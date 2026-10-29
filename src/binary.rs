@@ -108,7 +108,6 @@ pub fn resolve_lsp(worktree: &zed::Worktree, settings: &Settings) -> zed::Result
 }
 
 /// 解析 `tiptop` 可执行文件路径（供 slash command / task 生成脚本使用）。
-#[allow(dead_code)] // P1 起使用，见 PLAN Z-P0-5 / Z-P1-1
 pub fn resolve_tools(worktree: &zed::Worktree, settings: &Settings) -> zed::Result<String> {
     let name = exe_name(TOOLS);
 

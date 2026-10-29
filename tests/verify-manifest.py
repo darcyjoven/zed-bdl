@@ -241,6 +241,8 @@ def main() -> int:
     for cmd, spec in (manifest.get("slash_commands", {}) or {}).items():
         if not (spec or {}).get("description"):
             fail(f"slash_commands.{cmd} 缺少 description（Zed 清单要求）")
+        if "requires_argument" not in (spec or {}):
+            fail(f"slash_commands.{cmd} 缺少 requires_argument（Zed 清单要求，必填）")
 
     rust_src = "\n".join(
         p.read_text(encoding="utf-8") for p in sorted((ROOT / "src").glob("*.rs"))

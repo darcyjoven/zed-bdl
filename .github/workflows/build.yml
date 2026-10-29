@@ -78,6 +78,13 @@ jobs:
         working-directory: zed-extension
         run: python3 tests/verify-manifest.py
 
+      - name: 校验 .zed 初始化脚本的产物
+        # 断言生成出来的 tasks.json 里没有 Zed 解析不了的 ${path} 之类占位符
+        # （有的话整条 task 会从 task: spawn 列表里消失）。
+        # ubuntu runner 自带 pwsh，bash + PowerShell 两个版本都会实跑。
+        working-directory: zed-extension
+        run: python3 tests/verify-init-script.py
+
       - name: 校验 grammar rev 真实存在
         # extension.toml 里的 rev 必须能在 grammar 仓库里找到，
         # 否则用户安装扩展时 Zed 拉不到 grammar，安装直接失败。

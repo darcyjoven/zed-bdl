@@ -262,31 +262,31 @@ zed.dev 官方语义：
 |---|---|---|---|---|
 | 诊断/悬停/跳转/引用/补全/重命名/Code Action/格式化 | ✅ | ✅ 同一个 `bdl-lsp` | ✅ | — |
 | 项目符号搜索（工作区索引） | ✅ `Ctrl+T` | ⚠️ 服务端实现了 `workspace/symbol` 但**未声明 capability** | ⚠️ 待实机核实；若不生效需 `bdl-lsp` 补 `workspaceSymbolProvider`（§10.2） | Z-P3-6 |
-| 语义高亮 | ✅ 默认开 | ⚠️ 默认 off + 缺规则文件 | 🔧 加 `semantic_token_rules.json`（bdl+per）+ 文档教开 `combined` | Z-P0-4 |
-| 设置是否生效 | ✅ | ❌ 未到服务端 | 🔧 改为 initializationOptions 下发 + 补 `off` 默认 | Z-P0-3 |
-| 设置热更新 | ✅ `didChangeConfiguration` | ❌ 扩展发不了 | 🔒⚠️ 服务端支持 `workspace/configuration` 后由 Zed 原生通道热更新（**待确认**；不做则改设置需重启） | Z-P3-1 |
-| 大文件跳过提示 + 强制解析 | ✅ 标题栏按钮 + 状态栏 | ❌ 无按钮 | ⬇️ `/bdl-force-parse`（P3 后可用；之前用 `lsp command selector` 或 task 调 `bdl-lsp check`） | Z-P1 / Z-P3-2 |
+| 语义高亮 | ✅ 默认开 | ⚠️ Zed 默认 `off`，扩展规则文件**已加**（0.2.0） | ✅ 落地；文档教开 `semantic_tokens: "combined"`；着色效果待实机（§11.2 #6） | Z-P0-4 |
+| 设置是否生效 | ✅ | ❌ 未到服务端 | ✅ **0.2.0 已修**：有效配置从 `initializationOptions` 下发 + 补 `mode:"off"` 默认；待实机（§11.2 #4/#5） | Z-P0-3 |
+| 设置热更新 | ✅ `didChangeConfiguration` | ❌ 扩展发不了；改配置需重启服务器 | 🔒⚠️ 服务端支持 `workspace/configuration` 后由 Zed 原生通道热更新（**待确认**） | Z-P3-1 |
+| 大文件跳过提示 + 强制解析 | ✅ 标题栏按钮 + 状态栏 | ❌ 无按钮 | ⬇️ `/bdl-force-parse` 已就位（当前返回"需 Z-P3-2 + 替代办法"）；`lsp command selector` 亦可 | Z-P3-2 |
 
 ### 6.2 命令与运行
 
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
-| 资料采集/导入/局部同步（link 5 条 + schema 11 条） | ✅ | ❌ | ⬇️ task 调 `tiptop …` | Z-P1-2 |
-| 只读查询（状态/表清单/列清单/目标列表/预演） | ✅ | ❌ | ⬇️ slash command（读 `.project/` 资料文件；`/bdl-deploy-dry-run` 调 CLI） | Z-P1-1 |
-| 上传/下载/预演上传（单文件） | ✅ | ❌ | ⬇️ task（`$ZED_RELATIVE_FILE` + `"save": "current"`） | Z-P1-2 |
-| 编译/链接/预览（生产端执行，6 条） | ✅ | ❌ | ⬇️ task 调 `tiptop exec`（`-region` / `-login-profile` 由生成脚本写入） | Z-P1-2 |
-| 整包部署（预演/列目标/执行） | ✅ CLI 用法 | ❌ | ⬇️ task 调 `tiptop deploy` | Z-P1-2 |
-| 项目初始化（拉代码） | ✅ 向导 + 集成终端 | ❌ | ⬇️ task 调 `scripts/init-project` 同款脚本（终端内交互） | Z-P1-2 |
-| 迁移旧资料目录（`.link/` → `.project/link/`） | ✅ 命令 | ❌ | ⬇️ task：移动文件的小脚本（不覆盖已有文件） | Z-P1-2 |
+| 资料采集/导入/局部同步（link 5 条 + schema 11 条） | ✅ | ❌ | ⬇️ task 调 `tiptop …`（**0.2.0 起**：仓库提供 21 条 task 模板 + 交互式生成脚本 `scripts/zed/`） | Z-P1-2 |
+| 只读查询（状态/表清单/列清单/目标列表/预演） | ✅ | ❌ | ✅ **0.2.0 已落地**：8 条 slash command（读 `.project/` 资料；`/bdl-deploy-dry-run` 调 CLI） | Z-P1-1 |
+| 上传/下载/预演上传（单文件） | ✅ | ❌ | ⬇️ task（`$ZED_RELATIVE_FILE` + `"save": "current"`；0.2.0 起由生成脚本产出） | Z-P1-2 |
+| 编译/链接/预览（生产端执行，6 条） | ✅ | ❌ | ⬇️ task 调 `tiptop exec`（`-region` / `-login-profile` 由生成脚本按区写入） | Z-P1-2 |
+| 整包部署（预演/列目标/执行） | ✅ CLI 用法 | ❌ | ⬇️ task 调 `tiptop deploy`；只读的预演/列目标另有 slash command | Z-P1-1 / Z-P1-2 |
+| 项目初始化（拉代码） | ✅ 向导 + 集成终端 | ❌ | ⬇️ task 调 `scripts/init-project` 同款脚本（终端内交互；生成脚本可写入） | Z-P1-2 |
+| 迁移旧资料目录（`.link/` → `.project/link/`） | ✅ 命令 | ❌ | ⬇️ task：移动文件的小脚本（不覆盖已有文件）——**未在 0.2.0 生成脚本里产出**，见 P2 | Z-P2-2 |
 | 反查引用程序 | ✅ 视图分页 | ❌ | ⬇️ **函数级反查**，落到 Code Lens / `executeCommand` | Z-P3-2 / Z-P3-3 |
-| 进度通知 + 取消 | ✅ | ❌ | ⬇️ task 终端原样输出 + 重跑取消 | Z-P1-2 |
+| 进度通知 + 取消 | ✅ | ❌ | ⬇️ task 终端原样输出 + 重跑取消（生成脚本已给 6 条 exec + deploy 加 `allow_concurrent_runs`） | Z-P1-2 |
 
 ### 6.3 视图与输出
 
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
 | 链接资料三级树（点击跳转） | ✅ | ❌ 无树视图 API | ⬇️ **Code Lens 挂在 MAIN 函数头**（每子文件一条、可点、上限汇总） | Z-P2-1 验证 → Z-P3-3 |
-| 字段资料树（正则过滤/勾选/批量/复制列定义） | ✅ | ❌ | ⬇️ slash command 文本列表（表/列）；悬停与补全承担"看列说明" | Z-P1-1 / §8 |
+| 字段资料树（正则过滤/勾选/批量/复制列定义） | ✅ | ❌ | ⬇️ **0.2.0 已落地** `/bdl-schema-tables`（子串 + `^`/`$` 锚点）+ `/bdl-schema-columns`；悬停与补全承担"看列说明"；批量同步用 task 的 `-tables`/`-tables-file`。**与 VSCode 的差异**：无勾选/多选、无完整正则、无「复制列定义」 | Z-P1-1 |
 | 输出面板（`4gl` / `4gl 任务`） | ✅ | ❌ | ⬇️ task 终端 + `zed: open log` | §8 |
 | 编译错误回写 Problems | ✅ | ❌ | ❌ 永久差异：只看终端 | §8 |
 | 状态栏 / 标题栏按钮 / 视图工具栏 / `when` 门控 | ✅ | ❌ | ⬇️ 命令面板 + keymap；门控由脚本自查并提示 | §8 |
@@ -339,9 +339,15 @@ cargo build --release --target wasm32-wasip2
 
 ### P1 · 命令入口（只改本仓库）
 
+> **进展（2026-10-29）**：Z-P1-1（8 条 slash command，`src/slash.rs` + `extension.toml`）、
+> Z-P1-3（capability 声明，格式已从宿主 `ExtensionManifest`/`capabilities.rs` 核实）、
+> Z-P1-4（`/bdl-env-check` 深度版：生效配置 + 两二进制版本实跑）**已落地**；
+> Z-P1-2 的生成脚本已进仓库（`scripts/zed/`），**待实机**验证生成的 task 能跑通。
+> 护栏：清单 17 项 ✓（含 slash 声明一致性）· `cargo test` 6 项 ✓ · wasm 274 KB ✓。
+
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|
-| **Z-P1-1** | 实现 `run_slash_command` + `[slash_commands.*]` 声明：8 条只读命令（`/bdl-env-check`、`/bdl-link-status`、`/bdl-schema-status`、`/bdl-schema-tables <正则>`、`/bdl-schema-columns <表>`、`/bdl-deploy-list`、`/bdl-deploy-dry-run`、`/bdl-force-parse`） | `src/lib.rs`、`extension.toml` | 命令名与声明一一对应（Z-P0-6 校验）；读文件类命令在无资料时给引导文案而非报错；`/bdl-force-parse` 在 P3-2 之前明确提示"需要服务端支持" | `src/lib.rs`、`extension.toml` |
+| **Z-P1-1** | 实现 `run_slash_command` + `[slash_commands.*]` 声明：8 条只读命令（`/bdl-env-check`、`/bdl-link-status`、`/bdl-schema-status`、`/bdl-schema-tables <过滤>`、`/bdl-schema-columns <表>`、`/bdl-deploy-list`、`/bdl-deploy-dry-run`、`/bdl-force-parse`） | `src/slash.rs` + `src/project.rs`、`extension.toml` | 命令名与声明一一对应（Z-P0-6 校验）；读文件类命令在无资料时给引导文案而非报错；`/bdl-force-parse` 在 P3-2 之前明确提示"需要服务端支持" | `src/**`、`extension.toml` |
 | **Z-P1-2** | task 模板与生成脚本：`scripts/zed/`（`init-workspace.sh` / `init-workspace.ps1`，交互式提问）+ 文档内置 task 模板（§3.3 清单） | `scripts/zed/**`、`README.md`、`docs/USER-GUIDE.md` | 脚本在干净项目里生成可用的 `.zed/{settings.json,tasks.json,bdl-tool.json}`；生成的 task 能在 Zed 里跑通（实机）；`.gitignore` 提示 secrets | `scripts/zed/**`、两份文档 |
 | **Z-P1-3** | 声明所需 capability（`process:exec` / `download_file`）：**先核实宿主 `ExtensionManifest.capabilities` 的确切字段格式再写**（官方 capabilities 文档只描述了用户侧 `granted_extension_capabilities` 的收紧格式） | `extension.toml` | 老版本 Zed 忽略未知键；新版本 Zed 首次使用按 capability 授权；文档说明用户可用 `granted_extension_capabilities` 收紧 | `extension.toml` |
 | **Z-P1-4** | `/bdl-env-check` 的深度版：显示生效设置摘要、`bdl-lsp`/`tiptop` 版本（跑 `version`）、资料目录状态、缺失项清单 | `src/lib.rs` | 输出可一条条对照 `docs/USER-GUIDE.md` §8 | `src/lib.rs` |
@@ -355,6 +361,7 @@ cargo build --release --target wasm32-wasip2
 | **Z-P2-1** | **Code Lens 实机验证（必须先做）**：① `code_lens: "on"` 时同一 range 的多条 lens 是否**各占一行**；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件；③ 决定了实现方式后再投入 Z-P3-3 | 需要**有 GUI 的机器**；结论回写本文件与 USER-GUIDE | 三条结论有截图/录屏；若②不成立，改用备选方案（终端清单 + `lsp command selector`）并更新 §8 | 本文件 + USER-GUIDE |
 | **Z-P2-2** | 链接关系终端清单 task：打印 MAIN 与链内子文件（含全局模组）路径清单，终端路径可点击 | `scripts/zed/**`、文档 | 无链接资料时提示先采集；有资料时清单与 `tiptop link status` 口径一致 | `scripts/zed/**`、文档 |
 | **Z-P2-3** | 字段资料只读列表（slash）与 `RECORD LIKE` 体验文档化 | `src/lib.rs`、`docs/USER-GUIDE.md` | `/bdl-schema-tables`、`/bdl-schema-columns` 输出正确 | `src/lib.rs`、USER-GUIDE |
+| **Z-P2-4** | **让 `ext.*` 真正生效**（本轮盘点发现的空档）：① 由扩展或生成脚本按 `ext.prod.deploy.*` **合成 `.project/deploy/deploy.json`**（对应 VSCode `deployconfig.ts` 的 `ensureDeployConfig`）——**目前 Zed 用户必须手写这份文件，否则 `tiptop upload/download/deploy` 无配置可读**；② 生成脚本读 `ext.build.*` 模板（否则这些键没有任何消费者）；③ 可选：`ext.deploy.enable=false` 时 `/bdl-deploy-*` 给提示 | `src/**`、`scripts/zed/**`、文档 | 用一个只有 `settings.ext.*` 的干净项目能直接跑通上传/编译；模板改 `ext.build.*` 后重跑生成脚本能得到新命令 | `src/**`、`scripts/zed/**`、文档 |
 
 ### P3 · 跨仓库（executeCommand / Code Lens / tiptop Release 已授权；标 ⚠️ 的两项待确认）
 
@@ -454,7 +461,8 @@ python3 tests/verify-manifest.py                       # 清单 17 项（含语�
 export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
-cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认）
+cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
+python3 tests/verify-init-script.py                     # .zed 初始化脚本产物（R12：断言无 ${…} 占位符、task 齐全、不写密码）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
 cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-wasip2/release/zed_bdl.wasm
@@ -473,9 +481,11 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | 5 | **轻量档默认** | 不写任何设置时，`link/schema` 不启用（无资料相关诊断/索引负载） | P0 |
 | 6 | **语义高亮** | 开 `semantic_tokens: "combined"`，自定义符号着色（验证 Z-P0-4） | P0 |
 | 7 | 跳转 GLOBALS / 引用 / 悬停 / 补全 / 重命名 / Code Action / 格式化 | 与 VSCode 行为一致；`.per` 不格式化 | P0 |
-| 8 | slash command | `/bdl-schema-status`、`/bdl-schema-tables` 返回文本正确 | P1 |
+| 8 | slash command | `/bdl-env-check`、`/bdl-schema-status`、`/bdl-schema-tables`、`/bdl-schema-columns` 在 Agent 面板有响应、文本正确；无资料时给引导文案而不是报错 | P1 |
 | 9 | task | 链接资料状态 / 全量更新 / 上传当前文件 / 预演上传 / 下载当前文件 / 4GL 编译 / Form 预览 | P1 |
-| 10 | 初始化工程脚本 | 生成 `.zed/{settings.json,tasks.json,bdl-tool.json}` 且内容正确 | P1 |
+| 10 | 初始化工程脚本 | `bash .zed/bdl/init-workspace.sh` 生成 `.zed/{settings.json,tasks.json,bdl-tool.json}` 且内容正确（Windows 用 `.ps1`） | P1 |
+| 10b | **task 没被变量过滤** | `task: spawn` 列表里能看到全部 20 条 `4gl:` task（**尤其 6 条 exec**：它们的 `-command` 里含 Zed 变量，写错会被过滤掉）；已存在的 `settings.json` 不被覆盖（写 `.bdl-new`） | P1 |
+| 10c | capability | 首次使用 slash command 触发 `process:exec` 时，Zed **不会**报 "capability ... was not listed in the extension manifest"；若用户收紧了 `granted_extension_capabilities`，按文档放行同形状 | P1 |
 | 11 | **Code Lens ①** | 开 `code_lens: "on"`：同一 range 的多条 lens **各占一行** | P2（先验证） |
 | 12 | **Code Lens ②** | 点击 lens 的 command 能执行并打开目标文件 | P2（先验证） |
 | 13 | Code Lens ③ | 链内文件数 > 上限时显示前 N 条 + 「…共 M 个」 | P3 |
@@ -505,6 +515,8 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | R9 | **无 GUI 无法自证** | 本沙箱没有 Zed，也没有 GUI | 自动化只覆盖清单/query/Rust 编译；UI 行为交 §11.2 清单 |
 | R10 | **本机网络受限** | `web_search` 端点余额不足；`raw.githubusercontent.com` 被 reset（`api.github.com`、`zed.dev` 可达） | 需要外部事实时用 `api.github.com`/`zed.dev`；不依赖搜索 |
 | R11 | **版本三仓库独立递增** | 无兼容矩阵，混装症状隐蔽 | Z-P4-4 的版本提示；文档给最低/推荐版本表 |
+| R12 | **tiptop 模板占位符在 Zed task 里会失效**（本轮实测） | VSCode 的 `bdl.build.*.command` 用 `${path}`/`${name}`/`${fullname}`，由插件展开后交给 tiptop；Zed 的 task 会把 `$…`/`${…}` 当**自己的变量**——未知变量要么让整条 task 被 `task: spawn` 过滤掉，要么展开成空串，远端命令直接跑错 | 生成脚本与文档统一改用 Zed 变量：`${path}`/`${fullpath}` → `$ZED_RELATIVE_DIR`、`${name}` → `$ZED_STEM`、`${fullname}` → `$ZED_FILENAME`；`tests/verify-init-script.py` 断言产物不含 `${` |
+| R13 | **`settings.ext.*` 目前无人消费**（本轮盘点发现） | 扩展不读 `ext.build.*` / `ext.deploy.enable` / `ext.prod.deploy.transport`（task 也读不到设置）；而 VSCode 是插件把 `bdl.prod.deploy.*` 合成 `.project/deploy/deploy.json` 并据此上传 —— **Zed 侧现在必须手写 deploy.json**，否则上传/下载/部署没有配置可读 | 文档已如实标注为"仅记录"；修法见 Z-P2-4（合成 deploy.json + 生成脚本读模板） |
 
 ---
 
