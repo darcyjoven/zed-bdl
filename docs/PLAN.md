@@ -339,11 +339,14 @@ cargo build --release --target wasm32-wasip2
 
 ### P1 · 命令入口（只改本仓库）
 
-> **进展（2026-10-29）**：Z-P1-1（8 条 slash command，`src/slash.rs` + `extension.toml`）、
-> Z-P1-3（capability 声明，格式已从宿主 `ExtensionManifest`/`capabilities.rs` 核实）、
-> Z-P1-4（`/bdl-env-check` 深度版：生效配置 + 两二进制版本实跑）**已落地**；
-> Z-P1-2 的生成脚本已进仓库（`scripts/zed/`），**待实机**验证生成的 task 能跑通。
-> 护栏：清单 17 项 ✓（含 slash 声明一致性）· `cargo test` 6 项 ✓ · wasm 274 KB ✓。
+> **进展（2026-10-29）**：Z-P1-1…Z-P1-4 **全部落地**并提交（`57a433b`）：
+> 8 条 slash command（`src/slash.rs` + `src/project.rs`）、capability 声明
+> （格式已从宿主 `ExtensionManifest`/`capabilities.rs` 核实）、
+> `scripts/zed/init-workspace.{sh,ps1}`（20 固定 + 1 可选 task；bash 版实跑通过，
+> ps1 本机无 pwsh 未实跑、留 CI）、`/bdl-env-check` 深度版。
+> 新增护栏 `tests/verify-init-script.py`（9 项，断言产物不含 `${…}`）。
+> 护栏：清单 17 项 ✓ · init-script 9 项 ✓ · query 47 项 ✓ · `cargo test` 6 项 ✓ · wasm 274 KB ✓。
+> 仍待**实机验收**：§11.2 #8–#10c（slash/task/capability/生成脚本）。
 
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|

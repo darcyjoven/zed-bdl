@@ -625,12 +625,16 @@ TASKS_OUT=$(fill_template "$TASKS_TMPL" \
     '@@EXEC_FLAGS@@' "$EXEC_FLAGS" \
     '@@INIT_TAIL@@' "$INIT_TAIL")
 
-# 防回归：生成的 task 里不许出现 ${...}（那是 VSCode 侧插件的模板占位符，
-# Zed 会当成自己的 task 变量；详见 docs/PLAN.md §12 R12）
+# 兜底断言（见 docs/PLAN.md R12）：Zed 会把 $… / ${…} 当成**自己的** task 变量，
+# 未知变量会让整条 task 从 task: spawn 列表消失、或被替换成空串。
+# 模板里只允许 Zed 变量（$ZED_RELATIVE_DIR / $ZED_STEM / $ZED_FILENAME 等），
+# 一旦生成结果里出现 ${…}，宁可不写盘。
+# shellcheck disable=SC2016  # 下面就是要匹配字面量 ${（故意的），不是漏写展开
 case "$TASKS_OUT" in
-    *\${*)
-        warn "生成的 tasks.json 里出现了 \${...}：Zed 会把它当自己的 task 变量处理。"
-        warn "请改用 Zed 变量：\$ZED_RELATIVE_DIR / \$ZED_STEM / \$ZED_FILENAME。"
+    *'${'*)
+        err "tasks.json 里出现了 \${...} 占位符（Zed 会把它当成自己的 task 变量）。已放弃写盘。"
+        err "请改用 \$ZED_RELATIVE_DIR / \$ZED_STEM / \$ZED_FILENAME。"
+        exit 1
         ;;
 esac
 

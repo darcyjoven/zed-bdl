@@ -318,6 +318,15 @@ bash .zed/bdl/init-workspace.sh          # 交互提问；每项回车即用默�
 
 脚本最多写出 **21 条 `4gl:` task**：20 条固定（链接资料 5 条、字段资料 3 条、上传/预演/下载 3 条、4GL/Form 执行 6 条、部署 3 条）+ 1 条可选的「初始化项目（从生产服务器拉取代码）」（仅当第 4 组填了 init-project 脚本路径时追加）。**脚本绝不询问、也绝不写入密码**；密码仍走 `.project/secrets.json` 或 `BDL_ORA_PASSWORD`。
 
+**重跑与清理（容易踩）**：
+
+- `.zed/settings.json` **一旦存在就永不覆盖**（即使上次是脚本自己生成的）→ 每次重跑都会再产出 `.zed/settings.json.bdl-new`，需要你手工合并；`.zed/tasks.json.bak`（以及 `.bak.<yyyyMMdd-HHmmss>`）会累积。建议把 `.zed/settings.json*` 加进 `.gitignore`，并定期删掉 `.bdl-new` / `.bak*`。
+- **`allow_concurrent_runs: true` 只加在 6 条 `exec` 与 3 条 `deploy` 上**（"重跑即取消上一次"只对它们成立）；4 条 link/schema 同步**没有**这个字段。
+- 两个 `…从 CSV 导入` task 里的 **`<CSV 绝对路径>` 是占位符**，每次运行前要改成实际路径；`按模组更新` 里的 `-modules lib,sub,qry` 是示例。
+- 6 条 `exec` **不传 `-workspace`**（只传 `-region` / `-login-profile`），靠 task 的 `"cwd": "$ZED_WORKTREE_ROOT"`；`tiptop` 的 `-workspace` 默认就是 cwd。
+- `$ZED_RELATIVE_DIR` 是"**当前文件所在目录**（相对工作区根）"，与 VSCode 的 `${path}`（固定**两层**目录）**近似但不完全等价**；`${fullpath}`（三层）在 Zed 里**没有对应物**。
+- 脚本内置兜底：生成的 task 里一旦出现 `${…}` 就**拒绝写盘**（exit 1，不产生半份文件）——防止有人把 VSCode 的模板占位符改回来。
+
 **为什么要有 `bdl-tool.json`**：task **读不到 Zed 设置**，无法把 `ext.prod.deploy.host` 插进命令行，所以生成脚本必须把值**写进文件**（或写进 task 的 `args`）；脚本还会提醒你把 `.zed/settings.json` 与 `.project/secrets.json` 加进 `.gitignore`。
 
 也可以不用脚本：手工把 §1.3 的配置贴进 `.zed/settings.json`，按 §8.4 手工建 `.zed/tasks.json`。
