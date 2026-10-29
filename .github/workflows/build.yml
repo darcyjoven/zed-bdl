@@ -78,6 +78,10 @@ jobs:
         working-directory: zed-extension
         run: python3 tests/verify-manifest.py
 
+      - name: 校验文档与实现一致（版本 / 命令条数 / 护栏数字 / 过期引用）
+        working-directory: zed-extension
+        run: python3 tests/verify-docs.py
+
       - name: 校验 .zed 初始化脚本的产物
         # 断言生成出来的 tasks.json 里没有 Zed 解析不了的 ${path} 之类占位符
         # （有的话整条 task 会从 task: spawn 列表里消失）。

@@ -323,7 +323,7 @@ zed.dev 官方语义：
 | **Z-P0-3** | **配置下发修正**：`language_server_initialization_options` 返回「默认值 ⊕ `settings`(去掉 `ext`) ⊕ `initialization_options`」，并补 `link.mode="off"`、`schema.mode="off"`；`language_server_workspace_configuration` 返回同一份；`logLevel != "info"` 时同时作为 `serve --log-level` 参数 | `src/lib.rs` | 空设置时服务端拿到 `mode:"off"`（对照 `bdl-lsp` 的 `LinkEnabled`）；用户在 `settings` 里写的 `diagnostics`/`format` 生效；`ext` 不下发；`--log-level` 与 VSCode 一致 | `src/lib.rs` |
 | **Z-P0-4** | 语义高亮规则：`languages/bdl/semantic_token_rules.json` + `languages/per/semantic_token_rules.json`（按 bdl-lsp legend：`variable/parameter/function/struct/property/keyword`） | 两个语言目录 + `verify-manifest.py` | 新文件被校验；开 `semantic_tokens: "combined"` 后自定义符号着色（实机） | `languages/**`、`tests/verify-manifest.py` |
 | **Z-P0-5** | 二进制定位扩展：新增 `tiptop` 四级查找（`ext.tools.path` → `TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/tiptop[.exe]` → `PATH`），错误文案可操作 | `src/lib.rs`（抽 `binary.rs` 亦可） | 找不到时有可操作提示；与 `bdl-lsp` 的查找语义一致 | `src/lib.rs` |
-| **Z-P0-6** | 校验脚本扩展：`verify-manifest.py` 增加「`[slash_commands.*]` 声明 ↔ `src/` 的 `SLASH_COMMANDS` 常量一一对应」「`semantic_token_rules.json` 存在且 token_type/modifiers 属于 bdl-lsp legend」「`slash_commands` 必须有 description」 | `tests/verify-manifest.py` | 故意写错命令名/规则名时校验失败（14 项 → 17 项） | `tests/verify-manifest.py` |
+| **Z-P0-6** | 校验脚本扩展：`verify-manifest.py` 增加「`[slash_commands.*]` 声明 ↔ `src/` 的 `SLASH_COMMANDS` 常量一一对应」「`semantic_token_rules.json` 存在且 token_type/modifiers 属于 bdl-lsp legend」「`slash_commands` 必须有 description」；后续新增 **`verify-docs.py`**（文档契约：版本三处一致 / 命令条数与护栏数字对拍 / 无过期引用） | `tests/verify-manifest.py`、`tests/verify-docs.py` | 故意写错命令名/规则名/文档数字时校验失败（14 → 17 项；文档 9 项） | `tests/**` |
 
 **P0 验收门槛（任何提交前必过）**
 
@@ -484,6 +484,7 @@ export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
 cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
 python3 tests/verify-init-script.py                     # 初始化脚本产物 14 项（R12 无 ${…}、task 齐全、deploy.json、迁移 helper、ext.build 覆盖）
+python3 tests/verify-docs.py                            # 文档契约 9 项（版本三处一致 / 命令条数与护栏数字对拍 / 无过期引用）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
 cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-wasip2/release/zed_bdl.wasm
@@ -606,3 +607,4 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 3. **用户可见的新能力**必须同步 `README.md`（能力表）与 `docs/USER-GUIDE.md`（操作步骤），保持三份文档口径一致。
 4. **数字必须实测**：命令数、设置键数、诊断码、参数名一律来自源码或实跑输出；不引用 VSCode 侧文档里未经核对的数字。
 5. **跨仓库改动**：先在 §10.2 登记并取得用户确认，禁止先改后报。
+6. **数字不许漂移**：`tests/verify-docs.py` 会把 README/USER-GUIDE/PLAN 里声明的版本号、slash command 条数、护栏项数与实际对拍；改动能力或护栏后先跑它。
