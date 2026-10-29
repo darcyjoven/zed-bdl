@@ -359,6 +359,12 @@ cargo build --release --target wasm32-wasip2
 
 ### P2 · 链接视图的落地（先验证，再实现）
 
+> **进展（2026-10-29）**：**Z-P2-2 ① 已完成**（新增 `/bdl-link-chain <代码>`，3 个单测）、
+> **Z-P2-2 ② 已完成**（`.zed/bdl/migrate-data.{sh,ps1}` + 迁移 task，测试场景三实跑验证）、
+> **Z-P2-3 已完成**（P1 的 `/bdl-schema-tables` / `/bdl-schema-columns`）、
+> **Z-P2-4 ①② 已完成**（deploy.json 合成 + ext.build.* 回读，测试场景二/四）。
+> **Z-P2-1（Code Lens 实机验证）仍在等有 GUI 机器的结论**，它决定 Z-P3-3 的实现方式。
+
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|
 | **Z-P2-1** | **Code Lens 实机验证（必须先做）**：① `code_lens: "on"` 时同一 range 的多条 lens 是否**各占一行**；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件；③ 决定了实现方式后再投入 Z-P3-3 | 需要**有 GUI 的机器**；结论回写本文件与 USER-GUIDE | 三条结论有截图/录屏；若②不成立，改用备选方案（终端清单 + `lsp command selector`）并更新 §8 | 本文件 + USER-GUIDE |
@@ -536,6 +542,15 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 ---
 
 ## 13. 执行顺序建议
+
+> **进度（2026-10-29，共 9 次提交、3 仓库已推送）**：
+> 第一轮 ✅ 全部落地（`ca2d78b`）· 第二轮 ✅（`57a433b`/`3d2b87f`/`f4ac5c9`）·
+> 第三轮：Z-P2-2 ①② ✅、Z-P2-3 ✅、Z-P2-4 ①② ✅（`7537987`/`e184832`/`d5825af`）；**Z-P2-1 待实机** ·
+> 第四轮：Z-P3-2 ✅（`bdl-lsp 9e48960`）、Z-P3-4 ✅（`tiptop 9882882` + tag **v0.1.10**，Release 已实测）、
+> Z-P3-5 ✅（bdl-lsp/tiptop 文档已同步）；**Z-P3-1 / Z-P3-3 / Z-P3-6 待确认或待实机** ·
+> 第五轮 ✅（`90ae4d8`/`0c0cdf9`）· 第六轮待实机验收（由用户执行 §11.2 清单）。
+>
+> 护栏现状：清单 **17** 项 · init-script **14** 项 · query **47** 项 · `cargo test` **12** 项 · wasm 310 KB。
 
 ```text
 【第一轮 · 只改本仓库，零外部依赖】
