@@ -2,7 +2,7 @@
 
 > **盘点日期**：2026-10-28（本次为**全量重写**，旧 PLAN 已删除）
 > **参照物**：VSCode 插件 `vscode-bdl` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏视图）
-> **后端基线**：`bdl-lsp` **v0.3.14**（已发四平台 GitHub Release）· `tiptop` 源码 **0.1.10**（无 tag / 无 Release）
+> **后端基线**：`bdl-lsp` **v0.3.15**（四平台 Release，2026-10-29）· `tiptop` **v0.1.10**（四平台 Release，2026-10-29）
 > **本仓库基线**：`zed-bdl` **0.1.1**（目标 0.2.0 起分阶段推进）
 > **目的**：以 VSCode 侧**当前**已有进度为基准，把 Zed 侧推进到同等能力；平台做不到的部分**逐条给出已确认的降级方案**，不留"两边不一样"的模糊状态。
 >
@@ -48,7 +48,7 @@
 | 组件 | 版本 / 状态 | 证据 |
 |---|---|---|
 | `vscode-bdl`（4gl-full） | **0.9.2**，`bin/` 内置 `bdl-lsp` + `tiptop`，33 命令 / 50 设置键 / 2 视图 / 55 条 menus / 27 activationEvents / 0 keybindings | `vscode-extension/package.json:2,5,60,531-1019` |
-| `bdl-lsp` | 源码 **0.3.14**，tag `v0.3.14`，`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS` | `bdl-lsp/main.go:35`、`release.yml` |
+| `bdl-lsp` | 源码 **0.3.15**，tag `v0.3.15`（2026-10-29 发布，含 executeCommand / Code Lens / workspaceSymbolProvider），`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS` | `bdl-lsp/main.go:35`、`release.yml` |
 | `tiptop` | **v0.1.10**（2026-10-29 首次发布）；新增 `release.yml`：tag `v*` → 四平台产物 + `SHA256SUMS` | `tiptop/main.go:40`、`.github/workflows/release.yml` |
 | `zed-bdl`（本仓库） | **0.2.0**（P0 已落地）；`src/` 拆为 `lib.rs` + `config.rs` + `binary.rs`；10 个 `.scm`；**17 项**清单校验 + 47 项 query 校验 + 3 个单元测试 | `extension.toml:4`、`Cargo.toml:3`、`tests/` |
 | 本地已构建二进制 | `bdl-lsp 0.3.13`、`tiptop 0.1.8` —— **都过期**，`tiptop` 旧二进制缺 `download` / `-region` / `-login-profile` | 实跑 `artifacts/bin/* version` |
@@ -69,7 +69,7 @@
 | 旧结论 | 实测更正 |
 |---|---|
 | 「Zed 侧原样透传用户设置，服务端兜底 true」 | **更严重**：`lsp.bdl-lsp.settings` 根本不会到达 `bdl-lsp`（服务端从不发 `workspace/configuration`）。自定义键、`link.mode`、`diagnostics` 在 Zed 上今天**全部无效**。→ Z-P0-3 / Z-P3-1 |
-| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已完全满足**：`bdl-lsp`（v0.3.14）与 `tiptop`（v0.1.10，2026-10-29 首发）都有四平台 Release + `SHA256SUMS`。→ Z-P4-1 / Z-P4-2 均已落地 |
+| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已完全满足**：`bdl-lsp`（**v0.3.15**）与 `tiptop`（v0.1.10）都有四平台 Release + `SHA256SUMS`。→ Z-P4-1 / Z-P4-2 均已落地 |
 | 「跨仓库文档 `bdl-lsp/docs/PENDING.md` 是待办唯一清单」 | 该文件**已不存在**（现只有 `DIAGNOSTICS.md` + `FEATURES.md`）；VSCode 侧唯一待办是 `vscode-bdl/docs/TODO.md`，Zed 侧唯一待办是**本文件**。 |
 
 > 另需注意：`vscode-bdl/docs/FEATURES.md` 头部仍写 0.6.2、`COMMANDS.md` 里的命令数与设置键数互相矛盾、文档写了 `bdl/linkReferences` 但源码从未发送该请求。**追平时一律以源码/`package.json` 为准，不要抄 VSCode 侧文档的数字。**
@@ -198,13 +198,14 @@
 
 zed.dev 官方语义：
 - `lsp.<server>.initialization_options` → **启动时下发一次**，改动必须重启服务器；
+- `lsp.<server>.settings` → Zed **在启动时与设置变化时**都用 `workspace/didChangeConfiguration` 推给服务端（`crates/project/src/lsp_store.rs:694-721` 启动、`:9831-9932` 变化时），而不是"只等服务端请求 `workspace/configuration`"—— **这一条修正了 2026-10-28 的判断**；
 - `lsp.<server>.settings` → 服务端发 **`workspace/configuration`** 时作为应答返回（"May be queried by the server multiple times"）。
 
 `bdl-lsp` **从不发 `workspace/configuration`**（全仓库无该字符串）。因此：
 
 1. 今天 Zed 用户在 `lsp.bdl-lsp.settings` 里写的一切（`diagnostics`、`link.mode`、`format.*`…）**都不会生效**；
 2. 修法（本仓库，无需跨仓库）：在 `language_server_initialization_options` 里下发**有效配置** = 默认值 ⊕ `settings`（去掉 `ext`）⊕ `initialization_options`，并补 `link.mode="off"` / `schema.mode="off"` 默认；
-3. 想让"改设置立即生效"，需要 `bdl-lsp` 支持 `workspace/configuration`（**Z-P3-1，本次新增发现，待单独确认**）：届时 Zed 原生 `settings` 通道生效，扩展再保留 initializationOptions 下发作为兼容路径。不授权时的行为：设置只在语言服务器启动时生效，改完需重启（文档写清）。
+3. ~~想让"改设置立即生效"，需要 `bdl-lsp` 支持 `workspace/configuration`~~ → **结论已推翻**（2026-10-29 查 Zed 源码）：Zed 主动用 `workspace/didChangeConfiguration` 推设置（启动 + 每次设置变化），而 `bdl-lsp` **一直**在处理它（`internal/server/config.go` 的 `handleDidChangeConfiguration` → `cfg.Apply` + 重算诊断）。所以**改设置本来就会热应用**；`workspace/configuration` 再做一遍是冗余 → **Z-P3-1 不采纳**。扩展侧仍保留 `initializationOptions` 下发（兜底给不发 didChangeConfiguration 的客户端 + 注入轻量档默认）。
 
 ---
 
@@ -264,7 +265,7 @@ zed.dev 官方语义：
 | 项目符号搜索（工作区索引） | ✅ `Ctrl+T` | ❌ 服务端实现了 `workspace/symbol`，但**未声明 `workspaceSymbolProvider`**；Zed 对 `None` 的 server **直接跳过**（源码 `crates/project/src/lsp_store.rs:9438-9447`） | 🔒 需 `bdl-lsp` 补一行 `WorkspaceSymbolProvider: true`（**已由源码证实，不再是猜测**；等待授权） | Z-P3-6 |
 | 语义高亮 | ✅ 默认开 | ⚠️ Zed 默认 `off`，扩展规则文件**已加**（0.2.0） | ✅ 落地；文档教开 `semantic_tokens: "combined"`；着色效果待实机（§11.2 #6） | Z-P0-4 |
 | 设置是否生效 | ✅ | ❌ 未到服务端 | ✅ **0.2.0 已修**：有效配置从 `initializationOptions` 下发 + 补 `mode:"off"` 默认；待实机（§11.2 #4/#5） | Z-P0-3 |
-| 设置热更新 | ✅ `didChangeConfiguration` | ❌ 扩展发不了；改配置需重启服务器 | 🔒⚠️ 服务端支持 `workspace/configuration` 后由 Zed 原生通道热更新（**待确认**） | Z-P3-1 |
+| 设置热更新 | ✅ `didChangeConfiguration` | ✅ **本来就有**：Zed 在启动与设置变化时推送 `didChangeConfiguration`，`bdl-lsp` 热应用并重算诊断 | ✅ 已对齐；**Z-P3-1（服务端加 `workspace/configuration`）不需要做**（原判断有误） | — |
 | 大文件跳过提示 + 强制解析 | ✅ 标题栏按钮 + 状态栏 | ❌ 无按钮 | ⬇️ `/bdl-force-parse` 已就位（当前返回"需 Z-P3-2 + 替代办法"）；`lsp command selector` 亦可 | Z-P3-2 |
 
 ### 6.2 命令与运行
@@ -296,8 +297,8 @@ zed.dev 官方语义：
 
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
-| 二进制内置（平台包） | ✅ | ❌ | ✅ **Z-P4-1 / Z-P4-2 都已落地**：`bdl-lsp`（Release v0.3.14）与 `tiptop`（Release v0.1.10）都能按平台自动下载；本地已有则优先不下载 | Z-P4-1 / Z-P4-2 |
-| `bdl-lsp` Release | — | ✅ 已有 v0.3.14 + 四平台 + SHA256SUMS | 直接可用 | — |
+| 二进制内置（平台包） | ✅ | ❌ | ✅ **Z-P4-1 / Z-P4-2 都已落地**：`bdl-lsp`（Release **v0.3.15**）与 `tiptop`（Release v0.1.10）都能按平台自动下载；本地已有则优先不下载 | Z-P4-1 / Z-P4-2 |
+| `bdl-lsp` Release | — | ✅ 已有 **v0.3.15** + 四平台 + SHA256SUMS | 直接可用（含 executeCommand / Code Lens / workspaceSymbolProvider） | — |
 | `tiptop` Release | — | ✅ **已发 v0.1.10**（四平台 + `SHA256SUMS`，2026-10-29） | 流水线 `tiptop/.github/workflows/release.yml`；tag 推送自动出包 | Z-P3-4 |
 | 下载状态反馈 | ✅ 进度条 | ❌ | 🔧 `set_language_server_installation_status` + slash 文本 | Z-P4-3 |
 | 版本兼容矩阵 | ⚠️ 未解（VSCode P-10） | ⚠️ artifacts 二进制过期 | 🔧 `/bdl-env-check` 显示三方版本与最低要求 | Z-P4-4 |
@@ -375,16 +376,16 @@ cargo build --release --target wasm32-wasip2
 
 ### P3 · 跨仓库（executeCommand / Code Lens / tiptop Release 已授权；标 ⚠️ 的两项待确认）
 
-> **进展（2026-10-29）**：**Z-P3-2 已完成**（`bdl-lsp@9e48960`：`workspace/executeCommand` + 5 条命令，5 个协议级用例通过，`go test ./...` 全绿）。**Z-P3-4 已完成**（`tiptop` release.yml + tag **v0.1.10**，四平台产物 + `SHA256SUMS` 实测可用）。**Z-P3-3（Code Lens）已完成**（`bdl-lsp c0102a2`，服务端 6 个测试全绿）。**注意：Code Lens 与 executeCommand 目前只在 main 上，最近的 Release 仍是 v0.3.14**——要让"自动下载"的用户也拿到，需给 `bdl-lsp` 打新 tag（**待授权**）。Z-P3-1（workspace/configuration）与 Z-P3-6（workspaceSymbolProvider，已由源码证实需要）仍待确认。
+> **进展（2026-10-29）**：**Z-P3-2 已完成**（`bdl-lsp@9e48960`：`workspace/executeCommand` + 5 条命令，5 个协议级用例通过，`go test ./...` 全绿）。**Z-P3-4 已完成**（`tiptop` release.yml + tag **v0.1.10**，四平台产物 + `SHA256SUMS` 实测可用）。**Z-P3-3（Code Lens）已完成**（`bdl-lsp c0102a2`，服务端 6 个测试全绿）。**Z-P3-6 已完成并随 v0.3.15 发布**（`bdl-lsp d88cd97`：声明 `workspaceSymbolProvider`；本地 0.3.15 构建握手实测三个 capability 都在）。**Z-P3-1 经证据推翻、不采纳**（Zed 用 `didChangeConfiguration` 推设置，热更新本来就有）。**v0.3.15 已打 tag 并出包**（四平台 + SHA256SUMS）。
 
 | # | 任务 | 仓库 | 要做的事 | 验收 |
 |---|---|---|---|---|
-| **Z-P3-1** ⚠️**待确认** | `workspace/configuration` 支持（本次新增发现） | `bdl-lsp` | 初始化后向客户端请求 `workspace/configuration`（section `bdl`），把结果 `cfg.Apply`；后续 `didChangeConfiguration` 保持兼容 | 协议级测试；Zed 里改 `lsp.bdl-lsp.settings` 后**无需重启**生效（实机）。**不做也可**：设置仅在服务器启动时下发，改完需重启 |
+| ~~**Z-P3-1**~~ ❌ **不采纳** | `workspace/configuration` 支持 | `bdl-lsp` | **证据推翻需求**：Zed 主动推 `didChangeConfiguration`（启动 `lsp_store.rs:694-721`、变化时 `:9831-9932`），`bdl-lsp` 已在处理并热应用；再加 `workspace/configuration` 只是冗余 | — |
 | **Z-P3-2** | `workspace/executeCommand` 通道 | `bdl-lsp` | 加 `ExecuteCommandProvider`，把 `bdl/linkTree` / `bdl/linkReferences` / `bdl/schemaTables` / `bdl/schemaColumns` / `bdl/forceParse` 转接为标准命令（参数用 `arguments` 数组） | 协议级测试；VSCode 侧继续用自定义请求，**不受影响** |
 | **Z-P3-3** ✅ | `textDocument/codeLens`（**与 VSCode 侧 P1-8 同一份实现，两端共用**） | `bdl-lsp` | 链内子文件各一条 lens 挂 **MAIN 那一行**（数据来自 `link.Resolver.Tree()`，纯内存）；上限 `link.lensMax`（默认 10）+ 纯文本汇总；点击命令 `bdl.openLink` → 反向 `window/showDocument` | ✅ **已完成**（`c0102a2`）：6 个测试（lens 数量/顺序/纯文本/上限汇总/自我排除 + 协议端到端 + capability + 反向请求）；**Zed 侧渲染与点击待实机**（Z-P2-1） |
 | **Z-P3-4** ✅ | tag + 四平台 Release | `tiptop` | **已完成**：新增 `release.yml`（tag `v*` + dispatch，四平台原生 runner，检出兄弟目录 bdl-lsp；ref = 显式输入 > bdl-lsp 最近 Release tag > main），已打 **v0.1.10** 并推送 | ✅ Release v0.1.10 实测有 4 个产物 + `SHA256SUMS`；下载校验和通过、`tiptop version` = 0.1.10、`download`/`exec` 子命令在 |
 | **Z-P3-5** | 文档同步 | `bdl-lsp` / `tiptop` | `FEATURES.md` 补 `workspace/configuration`、`executeCommand`、Code Lens 行；`tiptop` 补 Release | 两处口径一致 |
-| ~~Z-P3-6~~ | ⚠️**待授权**（证据已确凿）：声明 `workspaceSymbolProvider: true` | `bdl-lsp` | 服务端已实现 `workspace/symbol`，但 `InitializeResult` 没声明该 capability。Zed 源码里 `workspace_symbol_provider: None` → **continue（跳过该 server）**（`crates/project/src/lsp_store.rs:9438-9447`）→ 项目符号搜不到 BDL 函数 | 一行修复；改完按 §11.2 #19 复验（不再是"先核实要不要改"，而是"改完就能搜到"） |
+| **Z-P3-6** ✅ | 声明 `workspaceSymbolProvider: true` | `bdl-lsp` | **已完成**（`d88cd97`，随 v0.3.15 发布）：服务端一直在处理 `workspace/symbol`，Zed 对 `None` 的 server 直接跳过（`crates/project/src/lsp_store.rs:9438-9447`）；声明后「项目符号」能搜到 4GL 函数 | 本地 0.3.15 握手实测 `workspaceSymbolProvider: true`；实机按 §11.2 #19 复验 |
 | ~~Z-P3-7~~ | `vscode-bdl/docs/TODO.md` §3.5 Zed 章节更新 | `vscode-bdl` | **未授权**（用户只授权了 bdl-lsp/tiptop）；需要时单独确认，或由本文件取代 | — |
 
 ### P4 · 无感分发（只改本仓库）
@@ -468,11 +469,11 @@ cargo build --release --target wasm32-wasip2
 
 | 仓库 | 改动 | 说明 |
 |---|---|---|
-| `bdl-lsp` | **`workspace/configuration` 支持**（Z-P3-1） | **本次新增发现**：Zed 的 `lsp.<server>.settings` 只有服务端主动请求才下发。不做也能工作（配置在服务器启动时下发，改完需重启）；做了才有 VSCode 那样的设置热更新 |
-| `bdl-lsp` | **声明 `workspaceSymbolProvider: true`** | 服务端已实现 `workspace/symbol`（`server.go:229-230`）但 `InitializeResult` **没有该 capability**。**已由 Zed 源码证实**：`crates/project/src/lsp_store.rs:9438-9447` 对 `None` 直接 `continue`（跳过该 server）→「项目符号」搜不到 BDL 函数。一行修复 |
+| ~~`bdl-lsp`~~ | ~~`workspace/configuration` 支持（Z-P3-1）~~ → **不采纳** | **证据推翻**：Zed 用 `workspace/didChangeConfiguration` 主动推设置（启动 + 变化时，`lsp_store.rs:694-721`/`:9831-9932`），bdl-lsp 已处理并热应用（`internal/server/config.go`） |
+
 | `vscode-bdl` | `docs/TODO.md` §3.5（Zed 章节）与 `docs/OPEN-ITEMS.md` E-01…E-08 更新为本计划口径 | 用户本次只授权 bdl-lsp/tiptop；不授权也能进行：Zed 侧以本文件为准 |
 | `tree-sitter-bdl` | grammar rev 漂移治理：`extension.toml` 固定 `ad54d643…`，本地 HEAD 已到 `76ddcd3…`；`bdl-lsp/go.mod` 用 tag `v1.0.1`；`zed-ext` 注册表里另一个扩展固定 `c832493e…` | R3，见 §12；需要时再确认 |
-| `bdl-lsp` | **打 tag（如 v0.3.15）+ 触发 Release** | executeCommand（`9e48960`）与 Code Lens（`c0102a2`）目前只在 main 上；自动下载用的是 `latest_github_release`（现在拿到 v0.3.14，**不含这两项**）。打 tag 即可让扩展自动下载的用户用上 Code Lens / 命令通道 |
+| ~~`bdl-lsp`~~ | ~~打 tag + Release~~ | ✅ **已完成**：tag **v0.3.15**（2026-10-29）已推送并出包（四平台 + `SHA256SUMS`），扩展自动下载（`latest_github_release`）会拿到它 |
 | `zed-ext`（扩展注册表） | 注册 `4gl-full`（Z-P5-2 未排期） | — |
 
 ---
@@ -517,11 +518,11 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | 12 | **Code Lens ②** | 点击 lens 的 command 能执行并打开目标文件 | P2（先验证） |
 | 13 | Code Lens ③ | 链内文件数 > 上限时显示前 N 条 + 「…共 M 个」 | P3 |
 | 14 | 函数级反查 | 函数定义处可看「被 N 处调用」并跳转 | P3 |
-| 15 | 设置热更新 | 改 `settings` 后无需重启服务器生效（验证 Z-P3-1） | P3 |
+| 15 | 设置热更新 | 改 `settings`（例如 `diagnostics` 级别）后**无需重启**即生效；`zed: open log` 里应出现 bdl-lsp 的 `配置已更新` | P3（已由源码解释，实机顺手确认） |
 | 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功；删缓存可重下；失败有提示 | P4 |
 | 17 | 路径含空格与中文 | 诊断/跳转/下载/上传均正常（Windows 尤其） | P1/P4 |
 | 18 | ABI 15 ↔ Zed tree-sitter 运行时 | 高亮/outline 正常（若异常，是 grammar 兼容问题，需换 rev） | P0 |
-| 19 | **项目符号搜索** | `project symbols: toggle` 能搜到 BDL 函数。**已知前提**：`bdl-lsp` 当前未声明 `workspaceSymbolProvider`，Zed 会跳过它（源码已证）→ 本项在 Z-P3-6 修好前**预期就是搜不到**；修完再验 | P3（Z-P3-6） |
+| 19 | **项目符号搜索** | `project symbols: toggle` 能搜到 BDL 函数（`bdl-lsp ≥ 0.3.15` 已声明 `workspaceSymbolProvider`；0.3.15 之前预期搜不到） | P3（Z-P3-6 已修，待实机） |
 
 > **"CI 绿"≠"装上能用"**：以上 18 项必须在真机勾完才算追平完成。
 
@@ -555,9 +556,14 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > 第四轮：Z-P3-2 ✅（`bdl-lsp 9e48960`）、**Z-P3-3 ✅ 服务端 Code Lens 已实现（`bdl-lsp c0102a2`）**、
 > Z-P3-4 ✅（`tiptop 9882882` + tag **v0.1.10**）、Z-P3-5 ✅（bdl-lsp/tiptop 文档已同步）·
 > 第五轮 ✅（`90ae4d8`/`0c0cdf9`）· 第六轮：自测护栏加固（`2cfd8c8`/`f9e67e9`/`747bf1b`/`58a64ac`/`1754ab0`）。
+> **第七轮（用户授权后）**：**Z-P3-6 ✅**（`bdl-lsp d88cd97` 声明 `workspaceSymbolProvider`）、
+> **`bdl-lsp` tag v0.3.15 已发布**（四平台 + `SHA256SUMS`，含 executeCommand / Code Lens / 项目符号）、
+> **Z-P3-1 ❌ 不采纳**（证据推翻：Zed 用 `didChangeConfiguration` 推设置，热更新本来就有）、
+> 文档热更新口径全面更正（"改完必须重启" → "通常不用重启"）。
 >
-> **仍等用户**：① Zed 实机验收（§11.2，含 Code Lens 渲染/点击 `Z-P2-1`）；② Z-P3-1 / Z-P3-6 授权；
-> ③ 给 `bdl-lsp` 打新 tag（v0.3.15）——否则自动下载拿到的 v0.3.14 里没有 executeCommand / Code Lens。
+> **只剩一项等实机**：§11.2 的 Zed 验收清单（Code Lens 渲染/点击 = Z-P2-1、项目符号 = #19、
+> 设置热更新 = #15）。本地代偿已完成：capability 握手实测、lens 生成协议测试、
+> `bdl.openLink` 反向请求测试、release 产物 API 校验。
 >
 > 护栏现状：清单 **17** 项 · init-script **15** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 315 KB。
 
@@ -593,7 +599,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
   └─ 门槛：协议级测试 + 实机清单 11–15
 
 【第五轮 · 无感分发】
-  Z-P4-1/2 自动下载（两个都已完成：bdl-lsp v0.3.14 / tiptop v0.1.10）
+  Z-P4-1/2 自动下载（两个都已完成：bdl-lsp v0.3.15 / tiptop v0.1.10）
   Z-P4-3 下载状态提示
   Z-P4-4 版本兼容提示
   └─ 门槛：实机清单 16

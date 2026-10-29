@@ -13,7 +13,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 > - v1 验证平台：**Linux + Windows**（macOS 后续补齐）。
 
 **版本**：扩展 `0.1.1` → 目标 `0.2.0`（追平中，阶段见 [PLAN §7](docs/PLAN.md)）。
-后端：`bdl-lsp` **v0.3.14**（已有四平台 Release）· `tiptop` **0.1.10**（源码）。
+后端：`bdl-lsp` **v0.3.15**（四平台 Release；含 executeCommand / Code Lens / workspaceSymbolProvider）· `tiptop` **v0.1.10**（四平台 Release）。
 
 ---
 
@@ -162,8 +162,8 @@ cd tiptop;  powershell -File scripts\build.ps1
 > `workspace/configuration` 时下发，而 `bdl-lsp` 不发这个请求，所以扩展把
 > `lsp.bdl-lsp.initialization_options` ⊕ `settings`（去掉仅扩展自用的 `ext`）
 > ⊕ 轻量档默认（`link/schema mode=off`）合并后从 `initializationOptions` 下发。
-> 代价是**改配置要重启语言服务器**（`lsp: restart language server`），
-> 等服务端支持 `workspace/configuration`（PLAN Z-P3-1）后即可热更新。
+> **改设置通常不用重启**：Zed 会在启动时**和设置变化时**给服务端发 `workspace/didChangeConfiguration`（payload 就是这块设置），`bdl-lsp` 会热应用并重算诊断。只有换二进制路径/参数才需要重启。
+> （此前文档写「必须重启」是错的，2026-10-29 查 Zed 源码后更正，见 PLAN §4.4。）
 
 ---
 

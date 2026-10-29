@@ -6,7 +6,7 @@
 |---|---|
 | 扩展 id | **`4gl-full`**（仓库 `zed-bdl`；可与只有 grammar 的轻量扩展 `bdl` 共存） |
 | 本手册对应版本 | 扩展 **`0.2.0`**（阶段见 [PLAN §7](PLAN.md)） |
-| 语言服务器 | `bdl-lsp` **v0.3.14**（已有 Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`） |
+| 语言服务器 | `bdl-lsp` **v0.3.15**（Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`） |
 | 采集 / 部署 CLI | `tiptop` **v0.1.10**（四平台 GitHub Release + `SHA256SUMS`；2026-10-29 首次发布） |
 | 参照物 | VSCode 插件 `4gl-full` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏树视图） |
 | v1 承诺平台 | **Linux + Windows**（macOS 后续补齐） |
@@ -24,7 +24,7 @@
 
 **两个入口**：会写盘、耗时长、需要交互输入的事（采集 / 导入 / 同步 / 上传 / 下载 / 部署 / 初始化）→ **task**；只读短查询（状态 / 表清单 / 列清单 / 部署目标 / 环境自检）→ **slash command**（Agent 面板，`/bdl-…`）。Zed 扩展**无法注册任意命令到命令面板**，所以「命令面板里搜 `4gl:` 就有 33 条命令」在 Zed 上**不存在**（§9）。
 
-**0.2.0 起配置会真正下发到 `bdl-lsp`**（`settings` 合并进 `initializationOptions`）；但生效配置**只在语言服务器启动时读一次**——**改了 `lsp.bdl-lsp.settings` 必须重启语言服务器**（§1.3 / §10.7）。
+**0.2.0 起配置会下发到 `bdl-lsp`**：扩展把 `settings` 合并进 `initializationOptions`；同时 **Zed 自己还会在启动时与设置变化时推送 `workspace/didChangeConfiguration`**（payload 就是这块设置），`bdl-lsp` 收到后热应用并重算诊断 —— **所以改设置通常不用重启语言服务器**（只有换二进制路径/参数才需要重启）。
 
 ---
 
@@ -46,7 +46,7 @@
 | 上传当前文件 / 预演上传 / 下载当前文件（单文件） | task → `tiptop upload` / `download` | ✅ 当前可用 | — |
 | 4GL / Form 的预演编译 / 编译 / 链接 / 预览画面 | task → `tiptop exec`（生产端执行） | ✅ 当前可用 | — |
 | 整包部署（`-dry-run` / `-list` / `-json`） | 终端 → `tiptop deploy`（**只有命令行**） | ✅ 当前可用 | — |
-| **用户设置真正到达 `bdl-lsp`** | 自动 | ✅ 0.2.0 已落地（改完**需重启语言服务器**） | P0（Z-P0-3） |
+| **用户设置到达 `bdl-lsp`** | 自动 | ✅ 0.2.0 已落地（轻量档默认 + 双通道下发：`initializationOptions` 与 Zed 的 `didChangeConfiguration`；**改完无需重启**） | P0（Z-P0-3） |
 | **轻量档默认**（不写 `link/schema` 时补 `mode:"off"`） | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-3） |
 | 语义高亮（扩展自带 `semantic_token_rules.json`） | `"semantic_tokens": "combined"` | ✅ 0.2.0 已提供规则（**着色效果 ⚠️ 待实机核实**） | P0（Z-P0-4） |
 | `tiptop` 四级二进制定位 | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-5） |
@@ -109,7 +109,7 @@ Zed 命令面板（cmd-shift-p / ctrl-shift-p）→ 输入 zed: install dev exte
 `tiptop` 同样有四个平台产物（`tiptop-<os>-<arch>.tar.gz|.zip`，含 `SHA256SUMS`）。
 
 - **本地已有二进制时永远优先**：只有「设置路径 → `BDL_LSP_PATH`/`TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/` → `PATH`」全部落空才会下载。
-- 缓存：扩展工作目录下按版本分目录（如 `bdl-lsp-0.3.14/`）。**只要缓存里有可用的二进制就直接复用最新一份，
+- 缓存：扩展工作目录下按版本分目录（如 `bdl-lsp-0.3.15/`）。**只要缓存里有可用的二进制就直接复用最新一份，
   不会每次都去查 GitHub**（离线也能启动）；只有缓存为空时才联网下载，下载完顺手清掉更旧的目录。
 - 关闭：`lsp.bdl-lsp.settings.ext.download.bdlLsp = "off"` / `ext.download.tiptop = "off"`（键缺省即 `auto`）。
 - capability：需要 `download_file`（`extension.toml` 已声明 `host=github.com`、`path=["darcyjoven","**"]`）；
@@ -137,7 +137,7 @@ cd tiptop;  powershell -File scripts\build.ps1
 > 0.1.8 的 `tiptop` **缺 `download`、`-region`、`-login-profile`**，表现为「未知子命令 / 参数不认识」。
 
 ```bash
-bdl-lsp version      # 期望 0.3.14
+bdl-lsp version      # 期望 0.3.15（≥0.3.13 都可用；0.3.15 起有 executeCommand / Code Lens / 项目符号）
 tiptop  version      # 期望 0.1.10
 ```
 
@@ -227,7 +227,7 @@ initialization_options（逃生口，最高优先级）
 1. `settings` 里的键到不了 `bdl-lsp` → **✅ 已合并进 `initializationOptions` 下发，直接写 `settings` 即可**。
 2. 不写 `link` / `schema` 时服务端按「启用」兜底（`LinkEnabled()` / `SchemaEnabled()` 在客户端未下发时返回 `true`）→ **✅ 扩展显式补 `mode:"off"`**（只在用户既没写 `mode` 也没写旧写法 `enable` 时补，不会覆盖显式配置）。
 
-**代价（务必记住）**：生效配置**只在语言服务器启动时下发一次** —— **改了 `settings` 必须重启语言服务器**（命令面板 `editor: restart language server`）。「改完立即生效」要等服务端支持 `workspace/configuration`（PLAN Z-P3-1）。
+**热更新（0.2.0 起）**：Zed 在启动时**和设置变化时**都会给服务端发 `workspace/didChangeConfiguration`（payload 就是这块设置），`bdl-lsp` 收到后热应用并重算诊断 → **通常不需要重启**。只有改 `binary.path` / `arguments`（进程启动参数）才必须重启（命令面板 `editor: restart language server`）。
 
 `initialization_options` 仍是**优先级最高的逃生口**（同名键会覆盖 `settings`），用法不变：
 
@@ -414,7 +414,7 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 怎么用：① 采集链接资料；② `link.mode` 不是 `off`；③ 在 `languages."Genero BDL"` 下开 `"code_lens": "on"`（**默认 `off`**）。Code Lens 是**宿主的 LSP 客户端功能**，服务端实现即可渲染。
 
 > **点击行为待实机确认（PLAN Z-P2-1）**：Zed 是否把 lens 的 `command` 转成 `workspace/executeCommand`、以及是否支持服务端反向的 `window/showDocument`。命令是 `bdl.openLink`；即使点击不生效，也可从 **`lsp command selector`** 手动触发同一条命令（兜底），或者用上面的 `/bdl-link-chain` 文本视图。
-> 另一前置：`bdl-lsp` 当前**最近的 Release 是 v0.3.14**，Code Lens 只在 main 上——自动下载拿到的是 v0.3.14；要让所有人用上，需要给 `bdl-lsp` 打一个新 tag（待授权）。
+> 前置已满足：**`bdl-lsp v0.3.15` 已发布**（2026-10-29），自动下载与手工安装都能拿到 Code Lens / `executeCommand` / 项目符号。
 
 > **Z-P2-1 是硬前置**：需要有 GUI 的机器验证 ① 同一 range 的多条 lens 是否各占一行；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件。若 ② 不成立就改用备选方案（终端清单 + 命令面板）并同步改文档。
 
@@ -518,7 +518,7 @@ DBA 侧导出 SQL 模板见 `vscode-extension/README.md` §3.1（字段名不要
 
 ### 4.2 在 Zed 里查看字段说明 [✅ 0.2.0 已落地（设置生效）/ ✅ 当前可用（读资料）]
 
-这一节由 `bdl-lsp` 提供，Zed 侧同样生效。0.2.0 起 `lsp.bdl-lsp.settings` 会合并下发（§1.3），所以**直接写 `link.mode` / `schema.mode` 即可**；默认是**轻量档**（扩展在未显式配置时补 `mode:"off"`），要用资料得改成 `"file"`（CSV 导入）或 `"db"`（直连采集）。**改完必须重启语言服务器**；只要采了资料且 mode 打开，就能看到说明。
+这一节由 `bdl-lsp` 提供，Zed 侧同样生效。0.2.0 起 `lsp.bdl-lsp.settings` 会合并下发（§1.3），所以**直接写 `link.mode` / `schema.mode` 即可**；默认是**轻量档**（扩展在未显式配置时补 `mode:"off"`），要用资料得改成 `"file"`（CSV 导入）或 `"db"`（直连采集）。**改完无需重启**（Zed 会推送 `didChangeConfiguration`，`bdl-lsp` 热应用）；只要采了资料且 mode 打开，就能看到说明。
 
 | 能力 | 触发 | 说明 |
 |---|---|---|
@@ -788,7 +788,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | 能力 | 说明 |
 |---|---|
 | 文件内大纲 | `documentSymbol`；MAIN 程序块的 `detail` 为 `MAIN` |
-| 工作区符号 | ❌ **当前在 Zed 里搜不到**：`bdl-lsp` 实现了 `workspace/symbol`（后台全工作区索引 + 持久化快照，覆盖未打开文件），但 `InitializeResult` **没有声明 `workspaceSymbolProvider`**；Zed 的源码对 `None` 的 server 是**直接跳过**（`crates/project/src/lsp_store.rs:9438-9447`）。修法是 `bdl-lsp` 补一行声明（PLAN Z-P3-6，**待授权**）；在那之前，跨文件跳转/引用仍正常，只有「项目符号」看不到 BDL 结果 |
+| 工作区符号 | ✅ **`bdl-lsp v0.3.15` 起可用**（后台全工作区索引 + 持久化快照，覆盖未打开文件）。此前搜不到的原因是 `InitializeResult` 没声明 `workspaceSymbolProvider`，而 Zed 对 `None` 的 server **直接跳过**（`crates/project/src/lsp_store.rs:9438-9447`）；现已补上声明（PLAN Z-P3-6，`d88cd97`）。实机用 `project symbols: toggle` 搜个函数名确认一下 |
 | 索引开关 | `settings.index.enable`（默认 `true`）；超大仓库或只想编辑单文件时可关 |
 | 性能 | 实测 7756 个文件首次约 **24.7 秒**（后台、不阻塞编辑），之后按 `(mtime,size)` 增量约 **22 毫秒** |
 
@@ -842,7 +842,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 }
 ```
 
-> 0.2.0 生效提示见 §1.3：这段直接写在 `lsp.bdl-lsp.settings` 里即可；**改完必须重启语言服务器**（生效配置只在启动时下发一次）。
+> 0.2.0 生效提示见 §1.3：这段直接写在 `lsp.bdl-lsp.settings` 里即可；**改完无需重启**（Zed 会在设置变化时推送 `didChangeConfiguration`）。
 
 > 📷 待补：编辑器里出现诊断（含级别颜色）与诊断列表（docs/images/zed/28-diagnostics.png）
 
@@ -884,7 +884,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 ### 8.1 Zed 设置总表 [✅ 0.2.0 已落地（生效性）/ ✅ 写法]
 
 位置：`lsp.bdl-lsp.settings`（`.zed/settings.json` 或全局 `settings.json`）。
-**0.2.0 提醒**：这些键会被扩展合并后从 `initializationOptions` 下发（去掉 `ext`、补轻量档默认），**直接写这里即可**；`initialization_options` 仍是优先级最高的逃生口（§1.3）。**改完必须重启语言服务器**（热更新见 P3 / Z-P3-1）。
+**0.2.0 提醒**：这些键会被扩展合并后从 `initializationOptions` 下发（去掉 `ext`、补轻量档默认），**直接写这里即可**；`initialization_options` 仍是优先级最高的逃生口（§1.3）。**改完无需重启**（Zed 设置变化时推送 `didChangeConfiguration`，`bdl-lsp` 热应用）。
 
 **① 下发给 `bdl-lsp` 的键**（与 `internal/config.Settings` 同名，**无 `bdl.` 前缀**）：
 
@@ -1085,7 +1085,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | 语言智能（诊断/悬停/跳转/引用/补全/重命名/Code Action/格式化） | ✅ | ✅ | 同一个 `bdl-lsp`，行为一致 |
 | 语义高亮 | ✅ 默认开 | ✅ 0.2.0 已提供规则（默认 off；着色 ⚠️ 待实机核实） | 开 `"semantic_tokens": "combined"`；规则文件已随 0.2.0 提供 |
 | 诊断渲染位置 | Problems 面板 + 内联 | ✅ 宿主直接渲染（内联/诊断列表） | Zed 无独立 Problems 面板，但诊断可用 |
-| **配置是否生效** | ✅ | ✅ 0.2.0 已到达服务端 | Z-P0-3 已修；改完**必须重启语言服务器** |
+| **配置是否生效** | ✅ | ✅ 0.2.0 起双通道下发（`initializationOptions` + Zed 的 `didChangeConfiguration`） | Z-P0-3 已修；**改完无需重启**（只有换二进制路径才要重启） |
 | **轻量档默认** | ✅ 三开关默认 off | ✅ 0.2.0 扩展补 `mode:"off"` | Z-P0-3 已修，与 VSCode 轻量档对齐 |
 | 命令面板注册 | ✅ **33 条**命令 | ❌ **无命令注册 API** | ⬇️ task（写盘/长任务）+ slash command（只读） |
 | 侧边栏树视图（链接资料 / 数据库字段） | ✅ **2 个 TreeView** | ❌ **无树视图 API** | ⬇️ 链接用 **Code Lens 挂 MAIN**（P3）；字段用 slash 文本（P1） |
@@ -1135,8 +1135,8 @@ which bdl-lsp          # Windows: where bdl-lsp
 | 诊断码被关了吗 | `diagnostics.<码>: "off"`；`record-member-unknown` **默认就是 off** |
 | 文件被忽略了吗 | `ignore.files` 命中会屏蔽该文件**所有**诊断 |
 | 文件太大 / 解析超时 | 会出现 `file-too-large` / `parse-timeout`，此时**跳过语法检查**（§7.2） |
-| 改完设置没重启 | `initialization_options` 只在启动时下发一次，**必须重启语言服务器** |
-| 0.2.0 起生效 | `settings` 会合并下发到服务端；若"改了没反应"，多半是**没重启语言服务器**（§1.3 / §10.7） |
+| 改完设置没生效 | 先确认写在 `lsp.bdl-lsp.settings` 下（不是 `initialization_options` 也不是顶层）；Zed 会在设置变化时推送 `didChangeConfiguration`，`bdl-lsp` 热应用。**只有换二进制路径/参数**才需要重启 |
+| 0.2.0 起生效 | 设置经 `initializationOptions` + `didChangeConfiguration` 双通道下发；若"改了没反应"，用 `zed: open log` 看 bdl-lsp 有没有打 `配置已更新`（打了就是 Zed 没把改动当设置变化，重启一次即可） |
 
 ### 10.3 函数全报「找不到定义」 [✅ 当前可用]
 
