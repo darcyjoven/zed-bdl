@@ -73,15 +73,19 @@ def fail(msg: str) -> None:
     print(f"  \u2717 {msg}")
 
 
-def run_generator(root: Path, shell: str) -> str:
-    """跑一次生成脚本，返回 stdout+stderr（供排查）。"""
+def run_generator(root: Path, shell: str, answers: str | None = None) -> str:
+    """跑一次生成脚本，返回 stdout+stderr（供排查）。
+
+    answers=None 时 stdin 是 /dev/null（走全部默认值）；给了就按提问顺序喂答案。
+    """
     if shell == "bash":
         cmd = ["bash", str(SH), str(root)]
     else:
         cmd = ["pwsh", "-NoProfile", "-File", str(PS1), str(root)]
     proc = subprocess.run(
         cmd,
-        stdin=subprocess.DEVNULL,
+        input=answers,
+        stdin=subprocess.DEVNULL if answers is None else None,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -89,6 +93,40 @@ def run_generator(root: Path, shell: str) -> str:
         env={**os.environ, "ZED_WORKTREE_ROOT": str(root)},
     )
     return proc.stdout
+
+
+# 交互提问顺序（两个脚本一致）：
+#   项目根 / bdl-lsp / tiptop / ora.host / ora.port / ora.service / ora.user
+#   / prod.host / prod.port / prod.user / region / remoteRoot / localRoot / transport / init-project
+PROD_ANSWERS = "\n" * 7 + "10.0.0.10\n22\nappuser\n1\n/u1/topprod\n.\nrsync\n\n"
+
+
+def check_deploy_json(root: Path, shell: str) -> None:
+    """有生产环境时，脚本应生成 tiptop 能读的 .project/deploy/deploy.json。"""
+    path = root / ".project/deploy/deploy.json"
+    if not path.is_file():
+        fail(f"[{shell}] 填了生产环境但没生成 .project/deploy/deploy.json")
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        fail(f"[{shell}] deploy.json 不是合法 JSON：{exc}")
+        return
+    target = data.get("targets", {}).get("prod", {})
+    problems = []
+    if target.get("host") != "10.0.0.10":
+        problems.append(f"host={target.get('host')!r}")
+    if target.get("remoteRoot") != "/u1/topprod":
+        problems.append(f"remoteRoot={target.get('remoteRoot')!r}")
+    if target.get("upload", {}).get("mode") != "rsync":
+        problems.append(f"upload.mode={target.get('upload', {}).get('mode')!r}")
+    tpl = target.get("compile", {}).get("4gl", "")
+    if "{file}" not in tpl:
+        problems.append(f"compile.4gl 缺少 {{file}}：{tpl!r}")
+    if problems:
+        fail(f"[{shell}] deploy.json 字段不对：{problems}")
+    else:
+        ok(f"[{shell}] 生成 .project/deploy/deploy.json（host/remoteRoot/upload.mode/compile.{{file}} 都对）")
 
 
 def find_secret_keys(value, path=""):
@@ -190,6 +228,20 @@ def main() -> int:
         else:
             fail("第二次运行：settings.json 被覆盖或没写 .bdl-new")
 
+    # 场景二：填了生产环境 → 生成 deploy.json；再跑一次 → 不覆盖、写 .bdl-new
+    with tempfile.TemporaryDirectory(prefix="bdl-init-prod-") as tmp:
+        root = Path(tmp)
+        run_generator(root, "bash", PROD_ANSWERS)
+        check_deploy_json(root, "bash")
+        before = (root / ".project/deploy/deploy.json").read_bytes()
+        run_generator(root, "bash", PROD_ANSWERS)
+        after = (root / ".project/deploy/deploy.json").read_bytes()
+        new_file = root / ".project/deploy/deploy.json.bdl-new"
+        if before == after and new_file.is_file():
+            ok("第二次运行：deploy.json 未被覆盖，另写了 .bdl-new")
+        else:
+            fail("第二次运行：deploy.json 被覆盖或没写 .bdl-new")
+
     if PS1.is_file() and shutil.which("pwsh"):
         with tempfile.TemporaryDirectory(prefix="bdl-init-ps-") as tmp:
             root = Path(tmp)
@@ -200,6 +252,10 @@ def main() -> int:
             else:
                 ok("PowerShell 版在空目录里跑通")
                 check_products(root, "pwsh")
+        with tempfile.TemporaryDirectory(prefix="bdl-init-ps-prod-") as tmp:
+            root = Path(tmp)
+            run_generator(root, "pwsh", PROD_ANSWERS)
+            check_deploy_json(root, "pwsh")
     else:
         print("  \u26a0 未找到 pwsh：跳过 PowerShell 版实跑（CI 的 ubuntu/windows runner 上有 pwsh，会在 CI 覆盖）")
 

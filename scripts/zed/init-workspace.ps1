@@ -530,6 +530,38 @@ $toolTmpl = @'
 }
 '@
 
+# tiptop 的部署配置（<项目根>/.project/deploy/deploy.json）。
+# 为什么生成脚本要写它：VSCode 插件会按设置合成这份文件（src/deployconfig.ts 的
+# ensureDeployConfig），Zed 侧没有任何东西读 ext.prod.deploy.*，而 tiptop 的
+# upload / download / deploy 都只认这份文件——不生成它就没有配置可读（PLAN Z-P2-4）。
+# 只在「生产主机 + 生产根都填了」且上传方式不是 off 时生成；已存在时写
+# deploy.json.bdl-new（与 settings.json 同一策略，不覆盖）。
+$deployTmpl = @'
+{
+  "defaultTarget": "prod",
+  "targets": {
+    "prod": {
+      "host": "@@PROD_HOST@@",
+      "port": @@PROD_PORT@@,
+      "user": "@@PROD_USER@@",
+      "remoteRoot": "@@REMOTE_ROOT@@",
+      "localRoot": "@@LOCAL_ROOT@@",
+      "strictHostKey": true,
+      "region": "@@REGION@@",
+      "upload": {
+        "mode": "@@TRANSPORT@@",
+        "fallback": "scp",
+        "include": ["**/*.4gl", "**/*.per"]
+      },
+      "compile": {
+        "4gl": "fglcomp -M {file}",
+        "per": "fglform {file}"
+      }
+    }
+  }
+}
+'@
+
 # 可选的「初始化项目」task（追加在数组末尾，避免额外的逗号处理）。
 # .ps1 → pwsh -File <路径>（与 bash 版一致，后缀判断区分大小写）；
 # 其它（.sh / .cmd / 无后缀）→ bash <路径>，与 bash 版一致。
@@ -631,6 +663,23 @@ $toolOut = Fill-Template $toolTmpl @{
     '@@TOOL_REL@@'     = '.zed/bdl-tool.json'
 }
 
+$deployDir = Join-Path (Join-Path $root '.project') 'deploy'
+$deployJson = Join-Path $deployDir 'deploy.json'
+$deployNew = Join-Path $deployDir 'deploy.json.bdl-new'
+$makeDeploy = $false
+if ((-not [string]::IsNullOrEmpty($prodHost)) -and (-not [string]::IsNullOrEmpty($remoteRoot)) -and ($transport -ne 'off')) {
+    $makeDeploy = $true
+    $deployOut = Fill-Template $deployTmpl @{
+        '@@PROD_HOST@@'   = $eProdHost
+        '@@PROD_PORT@@'   = $prodPort
+        '@@PROD_USER@@'   = $eProdUser
+        '@@REMOTE_ROOT@@' = $eRemoteRoot
+        '@@LOCAL_ROOT@@'  = $eLocalRoot
+        '@@REGION@@'      = $region
+        '@@TRANSPORT@@'   = $transport
+    }
+}
+
 # ---------------------------------------------------------------------------
 # 写盘（先校验内存内容，再写，再校验文件）
 # ---------------------------------------------------------------------------
@@ -688,6 +737,27 @@ if (Test-Path -LiteralPath $tasksJson -PathType Leaf) {
 }
 Write-Utf8NoBom $tasksJson $tasksOut
 Write-Utf8NoBom $toolJson $toolOut
+
+if ($makeDeploy) {
+    if (-not (Test-JsonText $deployOut)) {
+        Write-Host '错误：deploy.json 生成的内容不是合法 JSON（已放弃写盘）。' -ForegroundColor Red
+        exit 1
+    }
+    if (-not (Test-Path -LiteralPath $deployDir -PathType Container)) {
+        New-Item -ItemType Directory -Path $deployDir -Force | Out-Null
+    }
+    if (Test-Path -LiteralPath $deployJson -PathType Leaf) {
+        Write-Utf8NoBom $deployNew $deployOut
+        Write-Warn ('已存在 ' + $deployJson + ' —— 没有覆盖它，建议内容写到了 ' + $deployNew + '。')
+        Write-Warn ('tiptop 的 upload / download / deploy 只认 ' + $deployJson + '，请手工合并后再跑。')
+    } else {
+        Write-Utf8NoBom $deployJson $deployOut
+    }
+    $null = Assert-JsonFile $deployJson
+} else {
+    Write-Info '未生成 .project/deploy/deploy.json（生产主机/生产根为空，或上传方式为 off）'
+    Write-Info '  → 上传/下载/部署 需要它：重跑本脚本并填生产环境 + 选 rsync/scp，或手写（格式见 docs/USER-GUIDE.md §5.4）'
+}
 
 $null = Assert-JsonFile $settingsJson
 if ($settingsRel -eq '.zed/settings.json.bdl-new') { $null = Assert-JsonFile $settingsNew }

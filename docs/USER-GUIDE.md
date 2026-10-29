@@ -334,8 +334,9 @@ bash .zed/bdl/init-workspace.sh          # 交互提问；每项回车即用默�
 | `.zed/settings.json` | §1.3 的配置（含 `ext.prod.*`） | **不覆盖**，建议内容写到 `.zed/settings.json.bdl-new`（脚本提示手工合并） | ⚠️ 含主机/账号，**建议不进 git**（生产环境只写 Workspace 级） |
 | `.zed/tasks.json` | §8.4 的 task 模板，参数按你的回答填好 | 先备份为 `.zed/tasks.json.bak`（已存在则加时间戳）再写 | 可以提交（不含密码） |
 | `.zed/bdl-tool.json` | 本次输入值的记录（主机/区号/二进制路径/命令模板） | 直接覆盖 | 可以提交（不含密码） |
+| `.project/deploy/deploy.json` | tiptop 的部署配置（上传/下载/部署都要它） | **不覆盖**，建议内容写到 `.project/deploy/deploy.json.bdl-new` | ⚠️ 含主机/账号，建议不进 git |
 
-脚本最多写出 **21 条 `4gl:` task**：20 条固定（链接资料 5 条、字段资料 3 条、上传/预演/下载 3 条、4GL/Form 执行 6 条、部署 3 条）+ 1 条可选的「初始化项目（从生产服务器拉取代码）」（仅当第 4 组填了 init-project 脚本路径时追加）。**脚本绝不询问、也绝不写入密码**；密码仍走 `.project/secrets.json` 或 `BDL_ORA_PASSWORD`。
+填了生产环境时还会写 `.project/deploy/deploy.json`（见下）。脚本最多写出 **21 条 `4gl:` task**：20 条固定（链接资料 5 条、字段资料 3 条、上传/预演/下载 3 条、4GL/Form 执行 6 条、部署 3 条）+ 1 条可选的「初始化项目（从生产服务器拉取代码）」（仅当第 4 组填了 init-project 脚本路径时追加）。**脚本绝不询问、也绝不写入密码**；密码仍走 `.project/secrets.json` 或 `BDL_ORA_PASSWORD`。
 
 **重跑与清理（容易踩）**：
 
@@ -595,7 +596,9 @@ tiptop download -workspace . -file aap/4gl/x.4gl -dry-run
 - `-file` **必须相对路径**：绝对路径、盘符、`..` 越界都会被拒绝（路径安全）。
 - 下载是**覆盖写**，`tiptop` 自身**不备份也不询问**；Zed 侧没有差异确认弹窗（无 API），**下载前请自己 `git status` 或先提交**。
 - 上传/下载与 `tiptop deploy` 用**同一份配置** `.project/deploy/deploy.json`；上传前 task 里加 `"save": "current"`，否则传的是磁盘旧内容。
-- ⚠️ **Zed 侧没有"从设置合成 deploy.json"这一步**：VSCode 插件会按 `bdl.prod.deploy.*` 自动写 `.project/deploy/deploy.json`（`deployconfig.ts` 的 `ensureDeployConfig`），Zed 目前**需要你手写这份文件**（或者用 `tiptop deploy -config <文件>` 指定别处的配置）。`settings.ext.prod.deploy.*` 只是记录，**没有一个消费者**——已登记为 PLAN Z-P2-4（生成脚本/扩展合成 deploy.json）。手写样例见 §5.4。
+- ✅ **`.project/deploy/deploy.json` 由生成脚本产出**（`scripts/zed/init-workspace.*`）：问答里填了「SSH 主机 + 生产根」且上传方式不是 `off` 时，脚本会按 `ext.prod.deploy.*` 同一批答案写出这份配置（目标名 `prod`，`upload.mode` 取你选的 rsync/scp，`compile.4gl` = `fglcomp -M {file}`、`compile.per` = `fglform {file}`）；已存在则**不覆盖**，改写 `deploy.json.bdl-new`。
+  没用脚本 / 想改模板，就手写这份文件（样例见 §5.4），或用 `tiptop deploy -config <文件>` 指定别处配置。
+  `settings.ext.prod.deploy.*` 本身仍只是记录（没有消费者）；PLAN Z-P2-4 的剩余部分是让生成脚本回读 `ext.build.*` 模板。
 
 > 📷 待补：task 里「上传当前文件」的执行输出（含 rsync/scp 明细）（docs/images/zed/18-upload-task.png）
 

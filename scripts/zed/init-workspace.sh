@@ -661,10 +661,65 @@ TOOL_OUT=$(fill_template "$TOOL_TMPL" \
     '@@TOOL_REL@@' ".zed/bdl-tool.json")
 
 # ---------------------------------------------------------------------------
+# tiptop 的部署配置（<项目根>/.project/deploy/deploy.json）
+#
+# 为什么生成脚本要写它：VSCode 插件会**按设置合成**这份文件
+# （src/deployconfig.ts 的 ensureDeployConfig），Zed 侧没有任何东西读 ext.prod.deploy.*，
+# 而 tiptop 的 upload / download / deploy 都只认这份文件——不生成它，
+# Zed 上的上传/下载/部署就没有配置可读（PLAN Z-P2-4）。
+#
+# 只在「生产主机 + 生产根都填了」且上传方式不是 off 时生成；
+# 已存在时不覆盖（写 deploy.json.bdl-new，与 settings.json 同一策略）。
+# ---------------------------------------------------------------------------
+
+DEPLOY_TMPL=$(cat <<'JSON'
+{
+  "defaultTarget": "prod",
+  "targets": {
+    "prod": {
+      "host": "@@PROD_HOST@@",
+      "port": @@PROD_PORT@@,
+      "user": "@@PROD_USER@@",
+      "remoteRoot": "@@REMOTE_ROOT@@",
+      "localRoot": "@@LOCAL_ROOT@@",
+      "strictHostKey": true,
+      "region": "@@REGION@@",
+      "upload": {
+        "mode": "@@TRANSPORT@@",
+        "fallback": "scp",
+        "include": ["**/*.4gl", "**/*.per"]
+      },
+      "compile": {
+        "4gl": "fglcomp -M {file}",
+        "per": "fglform {file}"
+      }
+    }
+  }
+}
+JSON
+)
+
+# ---------------------------------------------------------------------------
 # 写盘（先校验内存内容，再写，再校验文件）
 # ---------------------------------------------------------------------------
 
 section "写盘"
+
+# 部署配置（可选）：生产主机 + 生产根都填了、且上传方式不是 off 才生成
+DEPLOY_DIR="$PROJECT_ROOT/.project/deploy"
+DEPLOY_JSON="$DEPLOY_DIR/deploy.json"
+MAKE_DEPLOY=0
+if [ -n "$PROD_HOST" ] && [ -n "$REMOTE_ROOT" ] && [ "$TRANSPORT" != "off" ]; then
+    MAKE_DEPLOY=1
+    DEPLOY_OUT=$(fill_template "$DEPLOY_TMPL" \
+        '@@PROD_HOST@@' "$E_PROD_HOST" \
+        '@@PROD_PORT@@' "$PROD_PORT" \
+        '@@PROD_USER@@' "$E_PROD_USER" \
+        '@@REMOTE_ROOT@@' "$E_REMOTE_ROOT" \
+        '@@LOCAL_ROOT@@' "$E_LOCAL_ROOT" \
+        '@@REGION@@' "$REGION" \
+        '@@TRANSPORT@@' "$TRANSPORT")
+fi
 
 validate_json_string "settings.json" "$SETTINGS_OUT" || die "settings.json 生成失败，未写任何文件。"
 validate_json_string "tasks.json" "$TASKS_OUT" || die "tasks.json 生成失败，未写任何文件。"
@@ -691,6 +746,21 @@ if [ -f "$TASKS_JSON" ]; then
 fi
 write_file "$TASKS_JSON" "$TASKS_OUT"
 write_file "$TOOL_JSON" "$TOOL_OUT"
+
+if [ "$MAKE_DEPLOY" = "1" ]; then
+    validate_json_string "deploy.json" "$DEPLOY_OUT" || die "deploy.json 生成失败，未写任何文件。"
+    mkdir -p "$DEPLOY_DIR" || die "无法创建目录：$DEPLOY_DIR"
+    if [ -f "$DEPLOY_JSON" ]; then
+        write_file "$DEPLOY_DIR/deploy.json.bdl-new" "$DEPLOY_OUT"
+        warn "已存在 $DEPLOY_JSON —— 没有覆盖它，建议内容写到了 $DEPLOY_DIR/deploy.json.bdl-new。"
+        warn "tiptop 的 upload / download / deploy 只认 $DEPLOY_JSON，请手工合并后再跑。"
+    else
+        write_file "$DEPLOY_JSON" "$DEPLOY_OUT"
+    fi
+else
+    info "未生成 .project/deploy/deploy.json（生产主机/生产根为空，或上传方式为 off）"
+    info "  → 上传/下载/部署 需要它：重跑本脚本并填生产环境 + 选 rsync/scp，或手写（格式见 docs/USER-GUIDE.md §5.4）"
+fi
 
 validate_json_file "$SETTINGS_JSON" || true
 if [ "$SETTINGS_REL" = ".zed/settings.json.bdl-new" ]; then

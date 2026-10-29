@@ -150,9 +150,9 @@ cd tiptop;  powershell -File scripts\build.ps1
 - `ext.build.*.command` 里的占位符与 VSCode 一致，分隔符恒为 `/`：`${path}`（两层，如 `axc/4gl`）、`${fullpath}`（三层）、`${name}`（去扩展名）、`${fullname}`（含扩展名）。
   ⚠️ **Zed 侧这些键目前只是记录**：task 读不到 Zed 设置，生成脚本用内置默认模板，
   真正生效的是 **`.zed/tasks.json` 里各 task 的 `-command`**（plan Z-P2-4 会让生成脚本读它们）。
-- ⚠️ **上传/下载/部署需要 `.project/deploy/deploy.json`**：VSCode 插件会按 `bdl.prod.deploy.*`
-  自动合成它，Zed 目前**要你手写**（样例见 [USER-GUIDE §5.4](docs/USER-GUIDE.md)）。
-  `settings.ext.prod.deploy.*` 同样只是记录（plan Z-P2-4）。
+- ✅ **上传/下载/部署需要的 `.project/deploy/deploy.json` 由生成脚本产出**（问答里填了生产主机 + 生产根、
+  上传方式不是 `off` 时；已存在则写 `deploy.json.bdl-new` 不覆盖）。不用脚本时可手写
+  （样例见 [USER-GUIDE §5.4](docs/USER-GUIDE.md)）；`settings.ext.prod.deploy.*` 本身只是记录（PLAN Z-P2-4）。
 - 完整键表与示例见 [USER-GUIDE §8](docs/USER-GUIDE.md)。
 
 > ℹ️ **`0.2.0` 起配置已生效**：Zed 的 `lsp.<server>.settings` 只在服务端请求
@@ -323,7 +323,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字覆盖 / 真实语料编译）
 cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py     # .zed 初始化脚本产物（task 齐全 / 无 ${…} 占位符 / 不写密码）
+python3 tests/verify-init-script.py     # 初始化脚本产物 11 项（task 齐全 / 无 ${…} / deploy.json / 不写密码）
 cargo build --release --target wasm32-wasip2
 ```
 

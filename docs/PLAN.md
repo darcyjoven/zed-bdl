@@ -344,7 +344,7 @@ cargo build --release --target wasm32-wasip2
 > （格式已从宿主 `ExtensionManifest`/`capabilities.rs` 核实）、
 > `scripts/zed/init-workspace.{sh,ps1}`（20 固定 + 1 可选 task；bash 版实跑通过，
 > ps1 本机无 pwsh 未实跑、留 CI）、`/bdl-env-check` 深度版。
-> 新增护栏 `tests/verify-init-script.py`（9 项，断言产物不含 `${…}`）。
+> 新增护栏 `tests/verify-init-script.py`（原 9 项；Z-P2-4 后 11 项，含 deploy.json 两个场景）。
 > 护栏：清单 17 项 ✓ · init-script 9 项 ✓ · query 47 项 ✓ · `cargo test` 6 项 ✓ · wasm 274 KB ✓。
 > 仍待**实机验收**：§11.2 #8–#10c（slash/task/capability/生成脚本）。
 
@@ -364,7 +364,7 @@ cargo build --release --target wasm32-wasip2
 | **Z-P2-1** | **Code Lens 实机验证（必须先做）**：① `code_lens: "on"` 时同一 range 的多条 lens 是否**各占一行**；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件；③ 决定了实现方式后再投入 Z-P3-3 | 需要**有 GUI 的机器**；结论回写本文件与 USER-GUIDE | 三条结论有截图/录屏；若②不成立，改用备选方案（终端清单 + `lsp command selector`）并更新 §8 | 本文件 + USER-GUIDE |
 | **Z-P2-2** | 链接关系终端清单 task：打印 MAIN 与链内子文件（含全局模组）路径清单，终端路径可点击 | `scripts/zed/**`、文档 | 无链接资料时提示先采集；有资料时清单与 `tiptop link status` 口径一致 | `scripts/zed/**`、文档 |
 | **Z-P2-3** | 字段资料只读列表（slash）与 `RECORD LIKE` 体验文档化 | `src/lib.rs`、`docs/USER-GUIDE.md` | `/bdl-schema-tables`、`/bdl-schema-columns` 输出正确 | `src/lib.rs`、USER-GUIDE |
-| **Z-P2-4** | **让 `ext.*` 真正生效**（本轮盘点发现的空档）：① 由扩展或生成脚本按 `ext.prod.deploy.*` **合成 `.project/deploy/deploy.json`**（对应 VSCode `deployconfig.ts` 的 `ensureDeployConfig`）——**目前 Zed 用户必须手写这份文件，否则 `tiptop upload/download/deploy` 无配置可读**；② 生成脚本读 `ext.build.*` 模板（否则这些键没有任何消费者）；③ 可选：`ext.deploy.enable=false` 时 `/bdl-deploy-*` 给提示 | `src/**`、`scripts/zed/**`、文档 | 用一个只有 `settings.ext.*` 的干净项目能直接跑通上传/编译；模板改 `ext.build.*` 后重跑生成脚本能得到新命令 | `src/**`、`scripts/zed/**`、文档 |
+| **Z-P2-4** | **让 `ext.*` 真正生效**（本轮盘点发现的空档）：① 生成脚本按问答**合成 `.project/deploy/deploy.json`**（对应 VSCode `deployconfig.ts` 的 `ensureDeployConfig`）—— ✅ **已完成**（bash + ps1 两个脚本；`verify-init-script.py` 两个场景覆盖"生成 / 已存在写 `.bdl-new`"）；② 生成脚本回读 `ext.build.*` 模板（否则这些键没有消费者）；③ 可选：`ext.deploy.enable=false` 时 `/bdl-deploy-*` 给提示 | `scripts/zed/**`、文档 | ①✅ 填了生产环境的项目能直接 `tiptop upload/download/deploy`；②待做：模板改 `ext.build.*` 后重跑生成脚本能得到新命令 | `scripts/zed/**`、文档 |
 
 ### P3 · 跨仓库（executeCommand / Code Lens / tiptop Release 已授权；标 ⚠️ 的两项待确认）
 
@@ -474,7 +474,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
 cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py                     # .zed 初始化脚本产物（R12：断言无 ${…} 占位符、task 齐全、不写密码）
+python3 tests/verify-init-script.py                     # 初始化脚本产物 11 项（R12 无 ${…}、task 齐全、deploy.json、不写密码）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
 cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-wasip2/release/zed_bdl.wasm
