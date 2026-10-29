@@ -51,7 +51,7 @@
 | 语义高亮（扩展自带 `semantic_token_rules.json`） | `"semantic_tokens": "combined"` | ✅ 0.2.0 已提供规则（**着色效果 ⚠️ 待实机核实**） | P0（Z-P0-4） |
 | `tiptop` 四级二进制定位 | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-5） |
 | 只读 slash command（9 条）+ task 生成脚本 + 扩展 `capabilities` 声明 | Agent 面板 `/bdl-…`；`scripts/zed/init-workspace.{sh,ps1}`；自动（首次弹授权） | ✅ 0.2.0 已落地 | P1（Z-P1-1 / Z-P1-2 / Z-P1-3） |
-| 项目初始化（拉代码，task 可挂载）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → 自备 `scripts/init-project/` 同款脚本 / 小脚本 | ✅ 0.2.0 已落地（生成脚本可挂载 init-project task）/ 🔧 计划中（迁移仍手工） | P1（Z-P1-2） |
+| 项目初始化（拉代码，task 可挂载）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → 自备 `scripts/init-project/` 同款脚本；迁移用生成脚本产出的 `.zed/bdl/migrate-data.{sh,ps1}` | ✅ 0.2.0 已落地（两者都有 task） | P1（Z-P1-2）/ P2（Z-P2-2） |
 | 表清单 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ 0.2.0 已落地 | P1（Z-P1-1） |
 | 链接关系查看：终端清单（当前替代）+ 就地 Code Lens | task 打印清单 / Code Lens 挂在 **MAIN** 上 | 🔧 计划中 | P2（Z-P2-2）→ 验证后 P3（Z-P2-1 / Z-P3-3） |
 | 反查引用（**函数级**口径） | Code Lens / `executeCommand` | 🔧 计划中 | P3（Z-P3-2 / Z-P3-3） |
@@ -335,8 +335,9 @@ bash .zed/bdl/init-workspace.sh          # 交互提问；每项回车即用默�
 | `.zed/tasks.json` | §8.4 的 task 模板，参数按你的回答填好 | 先备份为 `.zed/tasks.json.bak`（已存在则加时间戳）再写 | 可以提交（不含密码） |
 | `.zed/bdl-tool.json` | 本次输入值的记录（主机/区号/二进制路径/命令模板） | 直接覆盖 | 可以提交（不含密码） |
 | `.project/deploy/deploy.json` | tiptop 的部署配置（上传/下载/部署都要它） | **不覆盖**，建议内容写到 `.project/deploy/deploy.json.bdl-new` | ⚠️ 含主机/账号，建议不进 git |
+| `.zed/bdl/migrate-data.sh` / `.ps1` | 迁移旧资料目录的 helper（被「4gl: 迁移项目资料目录」task 调用） | 直接覆盖（脚本生成物） | 可以提交 |
 
-填了生产环境时还会写 `.project/deploy/deploy.json`（见下）。脚本最多写出 **21 条 `4gl:` task**：20 条固定（链接资料 5 条、字段资料 3 条、上传/预演/下载 3 条、4GL/Form 执行 6 条、部署 3 条）+ 1 条可选的「初始化项目（从生产服务器拉取代码）」（仅当第 4 组填了 init-project 脚本路径时追加）。**脚本绝不询问、也绝不写入密码**；密码仍走 `.project/secrets.json` 或 `BDL_ORA_PASSWORD`。
+填了生产环境时还会写 `.project/deploy/deploy.json`（见下）。脚本最多写出 **22 条 `4gl:` task**：21 条固定（链接资料 5 条、字段资料 3 条、上传/预演/下载 3 条、4GL/Form 执行 6 条、部署 3 条、迁移资料目录 1 条）+ 1 条可选的「初始化项目（从生产服务器拉取代码）」（仅当第 4 组填了 init-project 脚本路径时追加）。**脚本绝不询问、也绝不写入密码**；密码仍走 `.project/secrets.json` 或 `BDL_ORA_PASSWORD`。
 
 **重跑与清理（容易踩）**：
 
@@ -419,7 +420,7 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 命中查询的那一行会标 `← 查询的文件`。也可先跑 `tiptop link status -root .` 确认资料存在，或直接看 `.project/link/links.jsonl` 原始行。
 
 > 与终端清单的差异：slash command 输出在 **Agent 面板**（路径不可点击），但跨平台、可单测；
-> 「终端清单 task」当前**没有**产出（PLAN Z-P2-2 ② 连同"迁移旧资料目录"一起待做）。
+> 「终端清单 task」当前**没有**产出：链接关系的文本视图已由上面的 slash command 覆盖，迁移则有了专门的 task（见 §8.4 与 §10.4）。
 
 > 📷 待补：终端清单里 MAIN 与子文件路径清单（docs/images/zed/12-link-tree-terminal.png）
 
@@ -976,6 +977,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | `4gl: 4GL 预演编译 / 编译 / 链接` | `tiptop exec -command "<模板展开>" [-region ..] [-login-profile ..]` | ✅ 当前可用 |
 | `4gl: Form 预演编译 / 编译 / 预览画面` | 同上 | ✅ 当前可用 |
 | `4gl: 部署预演 / 列出目标` | `tiptop deploy -dry-run` / `tiptop deploy -list` | ✅ 当前可用 |
+| `4gl: 迁移项目资料目录（旧目录 → .project/）` | `.zed/bdl/migrate-data.sh`（Windows 用 `.ps1`）：只搬移、绝不覆盖，空旧目录删除 | ✅ 0.2.0 |
 
 可直接复制的 `.zed/tasks.json`（把 `<Oracle主机>` 等占位符换成实际值；或用 `scripts/zed/init-workspace.sh` 自动生成，§2.2）：
 
@@ -1149,7 +1151,7 @@ tiptop link sync -root . -source golang -host <主机> -service <服务名> -use
 
 - `bdl-lsp` **只读**资料并按 mtime 热重载（2 秒节流），正常情况下导入/同步后**不需要重启**。
 - 先确认**写对了目录**：默认 `.project/link/`；若改了 `link.dataDir`，`tiptop -out` 必须与之一致。
-- 旧目录 `.link/` 是**只读兼容**：`tiptop` 不往那儿写，但 `bdl-lsp` 会读（并给 `link-data-legacy-dir` 的 hint），所以"资料看着是旧的"很可能是**旧目录里还有一份**。迁移 task 仍属 **🔧 计划中·P2（Z-P2-2）**，现在手工迁移：
+- 旧目录 `.link/` 是**只读兼容**：`tiptop` 不往那儿写，但 `bdl-lsp` 会读（并给 `link-data-legacy-dir` 的 hint），所以"资料看着是旧的"很可能是**旧目录里还有一份**。**0.2.0 起有现成的迁移 task**：`4gl: 迁移项目资料目录（旧目录 → .project/）`（生成脚本产出的 `.zed/bdl/migrate-data.sh` / `.ps1`，只搬移、绝不覆盖，空旧目录顺手删除）；也可以手工迁移：
 
 ```bash
 mkdir -p .project/link
@@ -1268,7 +1270,7 @@ tiptop link status -root .        # 看生成时间与天数、局部更新 part
 - `zed-extension/docs/PLAN.md` —— 基线、Zed 平台能力边界（§4.1–4.4）、差距矩阵与降级方案（§6 / §8）、阶段任务 P0–P5（§7）、实机验收清单（§11.2）、风险（§12）
 - `zed-extension/README.md` —— 能力一览、安装、配置示例、task/slash 列表（口径一致性核对）
 - `zed-extension/tests/verify-manifest.py`、`tests/verify-queries.mjs` —— §6.1 的清单/query 校验口径
-- `zed-extension/scripts/zed/init-workspace.sh` —— 生成的 `.zed` 三件套、最多 21 条 task 的 label/args、不覆盖 settings / 备份 tasks / 不写密码等行为（§2.2 / §8.4 照此写）
+- `zed-extension/scripts/zed/init-workspace.sh` —— 生成的 `.zed` 三件套 + `.project/deploy/deploy.json` + `.zed/bdl/migrate-data.sh`、最多 22 条 task 的 label/args、不覆盖 settings / 备份 tasks / 不写密码等行为（§2.2 / §8.4 照此写）
 
 **`bdl-lsp`（语言服务）**
 

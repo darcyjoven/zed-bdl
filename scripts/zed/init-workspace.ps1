@@ -167,6 +167,23 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
     Write-Info ("写了 " + $Path)
 }
 
+# 写 UTF-8 **带 BOM**：只有 .ps1 需要（Windows PowerShell 5.1 没有 BOM 会把中文按
+# ANSI 码页解码成乱码）；生成的 JSON 一律无 BOM（见上）。
+function Write-Utf8Bom([string]$Path, [string]$Content) {
+    $dir = Split-Path -Parent $Path
+    if ($dir -and -not (Test-Path -LiteralPath $dir -PathType Container)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $enc = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $true
+    try {
+        [System.IO.File]::WriteAllText($Path, $Content + "`r`n", $enc)
+    } catch {
+        Write-Host ('错误：写入失败：' + $Path + ' —— ' + $_.Exception.Message) -ForegroundColor Red
+        exit 1
+    }
+    Write-Info ("写了 " + $Path)
+}
+
 # ---------------------------------------------------------------------------
 # 0. 项目根：位置参数 > $env:ZED_WORKTREE_ROOT > 当前目录（再交互确认）
 # ---------------------------------------------------------------------------
@@ -509,6 +526,14 @@ $tasksTmpl = @'
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
     "reveal": "always"
+  },
+  {
+    "label": "4gl: 迁移项目资料目录（旧目录 → .project/）",
+    "command": "pwsh",
+    "args": ["-File", ".zed/bdl/migrate-data.ps1", "$ZED_WORKTREE_ROOT"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
   }@@INIT_TAIL@@
 ]
 '@
@@ -560,6 +585,70 @@ $deployTmpl = @'
     }
   }
 }
+'@
+
+# 迁移 helper（生成的 .zed/bdl/migrate-data.ps1）。
+# 把旧布局资料搬进 .project/{link,schema,deploy}/；只搬移、绝不覆盖。
+$migrateTmpl = @'
+#Requires -Version 5.1
+# 4gl 资料目录迁移（由 zed-bdl 的 scripts/zed/init-workspace.ps1 生成）。
+#
+# 用法：pwsh -File .zed\bdl\migrate-data.ps1 [项目根]
+# 规则：只搬移、绝不覆盖；目标已存在就跳过并明确打印。
+
+param([string]$Root = '.')
+
+$ErrorActionPreference = 'Stop'
+Push-Location $Root
+$script:moved = 0
+$script:skipped = 0
+
+function Move-DataFile([string]$From, [string]$To) {
+    if (-not (Test-Path -LiteralPath $From)) { return }
+    if (Test-Path -LiteralPath $To) {
+        Write-Host ('跳过（目标已存在）：' + $From + '  ->  ' + $To)
+        $script:skipped++
+        return
+    }
+    $dir = Split-Path -Parent $To
+    if ($dir -and -not (Test-Path -LiteralPath $dir -PathType Container)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    Move-Item -LiteralPath $From -Destination $To
+    Write-Host ('搬移：' + $From + '  ->  ' + $To)
+    $script:moved++
+}
+
+Move-DataFile '.link/links.jsonl' '.project/link/links.jsonl'
+Move-DataFile '.link/links.meta.json' '.project/link/links.meta.json'
+Move-DataFile '.project/.schema/tables.json' '.project/schema/tables.json'
+
+if ((Test-Path -LiteralPath '.project/.schema/tables' -PathType Container) -and
+    -not (Test-Path -LiteralPath '.project/schema/tables')) {
+    New-Item -ItemType Directory -Path '.project/schema' -Force | Out-Null
+    Move-Item -LiteralPath '.project/.schema/tables' -Destination '.project/schema/tables'
+    Write-Host '搬移目录：.project/.schema/tables  ->  .project/schema/tables'
+    $script:moved++
+}
+
+Move-DataFile '.project/deploy.json' '.project/deploy/deploy.json'
+Move-DataFile '.bdl-lsp/deploy.json' '.project/deploy/deploy.json'
+
+foreach ($d in @('.link', '.project/.schema', '.bdl-lsp')) {
+    if (-not (Test-Path -LiteralPath $d -PathType Container)) { continue }
+    if (@(Get-ChildItem -LiteralPath $d -Force).Count -eq 0) {
+        Remove-Item -LiteralPath $d
+        Write-Host ('已删除空目录：' + $d)
+    } else {
+        Write-Host ('保留（还有其它文件）：' + $d)
+    }
+}
+
+Write-Host ''
+Write-Host ('完成：搬移 ' + $script:moved + ' 项，跳过 ' + $script:skipped + ' 项。')
+Write-Host 'bdl-lsp 按 mtime 热重载资料，无需重启；旧的 link-data-legacy-dir 提示会随之消失。'
+Write-Host 'secrets.json 不参与迁移：它本来就在 <项目根>/.project/secrets.json。'
+Pop-Location
 '@
 
 # 可选的「初始化项目」task（追加在数组末尾，避免额外的逗号处理）。
@@ -758,6 +847,10 @@ if ($makeDeploy) {
     Write-Info '未生成 .project/deploy/deploy.json（生产主机/生产根为空，或上传方式为 off）'
     Write-Info '  → 上传/下载/部署 需要它：重跑本脚本并填生产环境 + 选 rsync/scp，或手写（格式见 docs/USER-GUIDE.md §5.4）'
 }
+
+# 迁移 helper：放进项目的 .zed\bdl\，供 task「4gl: 迁移项目资料目录」调用
+$migratePath = Join-Path (Join-Path $zedDir 'bdl') 'migrate-data.ps1'
+Write-Utf8Bom $migratePath $migrateTmpl
 
 $null = Assert-JsonFile $settingsJson
 if ($settingsRel -eq '.zed/settings.json.bdl-new') { $null = Assert-JsonFile $settingsNew }

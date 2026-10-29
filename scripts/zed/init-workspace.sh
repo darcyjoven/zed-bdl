@@ -538,6 +538,14 @@ TASKS_TMPL=$(cat <<'JSON'
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
     "reveal": "always"
+  },
+  {
+    "label": "4gl: 迁移项目资料目录（旧目录 → .project/）",
+    "command": "bash",
+    "args": [".zed/bdl/migrate-data.sh", "$ZED_WORKTREE_ROOT"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "reveal": "always"
   }@@INIT_TAIL@@
 ]
 JSON
@@ -672,6 +680,77 @@ TOOL_OUT=$(fill_template "$TOOL_TMPL" \
 # 已存在时不覆盖（写 deploy.json.bdl-new，与 settings.json 同一策略）。
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 迁移 helper（生成的 .zed/bdl/migrate-data.sh）
+#
+# 把旧布局的资料搬进 .project/{link,schema,deploy}/：
+#   .link/                    → .project/link/
+#   .project/.schema/         → .project/schema/
+#   .project/deploy.json      → .project/deploy/deploy.json
+#   .bdl-lsp/deploy.json      → .project/deploy/deploy.json
+# 规则：**只搬移、绝不覆盖**；目标已存在就跳过并打印；旧目录空了顺手删掉。
+# secrets.json 不用搬（本来就在 .project/secrets.json）。
+# ---------------------------------------------------------------------------
+
+MIGRATE_TMPL=$(cat <<'SCRIPT'
+#!/usr/bin/env bash
+# 4gl 资料目录迁移（由 zed-bdl 的 scripts/zed/init-workspace.sh 生成）。
+#
+# 用法：bash .zed/bdl/migrate-data.sh [项目根]
+# 规则：只搬移、绝不覆盖；目标已存在就跳过并明确打印。
+set -euo pipefail
+
+root="${1:-.}"
+cd "$root"
+
+moved=0
+skipped=0
+
+move_file() { # <旧路径> <新路径>
+    if [ ! -e "$1" ]; then
+        return 0
+    fi
+    if [ -e "$2" ]; then
+        echo "跳过（目标已存在）：$1  →  $2"
+        skipped=$((skipped + 1))
+        return 0
+    fi
+    mkdir -p "$(dirname "$2")"
+    mv -- "$1" "$2"
+    echo "搬移：$1  →  $2"
+    moved=$((moved + 1))
+}
+
+move_file .link/links.jsonl     .project/link/links.jsonl
+move_file .link/links.meta.json .project/link/links.meta.json
+move_file .project/.schema/tables.json .project/schema/tables.json
+
+if [ -d .project/.schema/tables ] && [ ! -e .project/schema/tables ]; then
+    mkdir -p .project/schema
+    mv -- .project/.schema/tables .project/schema/tables
+    echo "搬移目录：.project/.schema/tables  →  .project/schema/tables"
+    moved=$((moved + 1))
+fi
+
+move_file .project/deploy.json .project/deploy/deploy.json
+move_file .bdl-lsp/deploy.json .project/deploy/deploy.json
+
+for dir in .link .project/.schema .bdl-lsp; do
+    [ -d "$dir" ] || continue
+    if [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
+        rmdir "$dir" && echo "已删除空目录：$dir"
+    else
+        echo "保留（还有其它文件）：$dir"
+    fi
+done
+
+echo
+echo "完成：搬移 $moved 项，跳过 $skipped 项。"
+echo "bdl-lsp 按 mtime 热重载资料，无需重启；旧的 link-data-legacy-dir 提示会随之消失。"
+echo "secrets.json 不参与迁移：它本来就在 <项目根>/.project/secrets.json。"
+SCRIPT
+)
+
 DEPLOY_TMPL=$(cat <<'JSON'
 {
   "defaultTarget": "prod",
@@ -761,6 +840,11 @@ else
     info "未生成 .project/deploy/deploy.json（生产主机/生产根为空，或上传方式为 off）"
     info "  → 上传/下载/部署 需要它：重跑本脚本并填生产环境 + 选 rsync/scp，或手写（格式见 docs/USER-GUIDE.md §5.4）"
 fi
+
+# 迁移 helper：放进项目的 .zed/bdl/，供 task「4gl: 迁移项目资料目录」调用
+mkdir -p "$PROJECT_ROOT/.zed/bdl" || die "无法创建目录：$PROJECT_ROOT/.zed/bdl"
+write_file "$PROJECT_ROOT/.zed/bdl/migrate-data.sh" "$MIGRATE_TMPL"
+chmod +x "$PROJECT_ROOT/.zed/bdl/migrate-data.sh" 2>/dev/null || true
 
 validate_json_file "$SETTINGS_JSON" || true
 if [ "$SETTINGS_REL" = ".zed/settings.json.bdl-new" ]; then

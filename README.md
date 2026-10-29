@@ -324,7 +324,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字覆盖 / 真实语料编译）
 cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py     # 初始化脚本产物 11 项（task 齐全 / 无 ${…} / deploy.json / 不写密码）
+python3 tests/verify-init-script.py     # 初始化脚本产物 13 项（task 齐全 / 无 ${…} / deploy.json / 迁移 helper / 不写密码）
 cargo build --release --target wasm32-wasip2
 ```
 

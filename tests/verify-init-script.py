@@ -55,6 +55,7 @@ EXPECTED_LABELS = [
     "4gl: 部署预演",
     "4gl: 列出部署目标",
     "4gl: 部署（整包，需确认）",
+    "4gl: 迁移项目资料目录（旧目录 → .project/）",
 ]
 
 checks = 0
@@ -160,7 +161,7 @@ def check_products(root: Path, shell: str) -> None:
     if missing:
         fail(f"[{shell}] 缺少 task：{missing}")
     else:
-        ok(f"[{shell}] 20 条固定 task label 齐全")
+        ok(f"[{shell}] 21 条固定 task label 齐全")
 
     bad = [
         (t.get("label"), a)
@@ -241,6 +242,48 @@ def main() -> int:
             ok("第二次运行：deploy.json 未被覆盖，另写了 .bdl-new")
         else:
             fail("第二次运行：deploy.json 被覆盖或没写 .bdl-new")
+
+    # 场景三：迁移 helper（.zed/bdl/migrate-data.sh）真的能搬旧资料、且不覆盖已有文件
+    with tempfile.TemporaryDirectory(prefix="bdl-init-mig-") as tmp:
+        base = Path(tmp)
+        gen = base / "gen"
+        gen.mkdir()
+        run_generator(gen, "bash")
+        helper = gen / ".zed/bdl/migrate-data.sh"
+        if not helper.is_file():
+            fail("生成脚本没有产出 .zed/bdl/migrate-data.sh")
+        else:
+            ok("生成脚本产出 .zed/bdl/migrate-data.sh")
+            proj = base / "proj"
+            (proj / ".link").mkdir(parents=True)
+            (proj / ".link/links.jsonl").write_text('{"schema":1}\n', encoding="utf-8")
+            (proj / ".link/links.meta.json").write_text('{"generatedAt":"x"}\n', encoding="utf-8")
+            (proj / ".project/.schema/tables").mkdir(parents=True)
+            (proj / ".project/.schema/tables/X.json").write_text('{"table":"X"}\n', encoding="utf-8")
+            (proj / ".bdl-lsp").mkdir()
+            (proj / ".bdl-lsp/deploy.json").write_text('{"targets":{}}\n', encoding="utf-8")
+            # 目标已存在 → 必须保留原内容（绝不覆盖）
+            (proj / ".project/schema").mkdir(parents=True)
+            (proj / ".project/schema/tables.json").write_text('{"keep":true}\n', encoding="utf-8")
+
+            proc = subprocess.run(
+                ["bash", str(helper), str(proj)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(proj),
+            )
+            moved_ok = (proj / ".project/link/links.jsonl").is_file() and (
+                proj / ".project/schema/tables/X.json"
+            ).is_file() and (proj / ".project/deploy/deploy.json").is_file()
+            kept = (proj / ".project/schema/tables.json").read_text(encoding="utf-8")
+            legacy_gone = not (proj / ".link").exists()
+            if proc.returncode != 0 or not moved_ok or not legacy_gone:
+                fail(f"迁移 helper 失败（rc={proc.returncode}）：{proc.stdout[-500:]}")
+            elif "keep" not in kept:
+                fail(f"迁移 helper 覆盖了已存在的 .project/schema/tables.json：{kept!r}")
+            else:
+                ok("迁移 helper：旧目录搬入 .project/、空目录删除、已存在的目标文件未被覆盖")
 
     if PS1.is_file() and shutil.which("pwsh"):
         with tempfile.TemporaryDirectory(prefix="bdl-init-ps-") as tmp:

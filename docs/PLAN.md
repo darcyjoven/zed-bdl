@@ -271,13 +271,13 @@ zed.dev 官方语义：
 
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
-| 资料采集/导入/局部同步（link 5 条 + schema 11 条） | ✅ | ❌ | ⬇️ task 调 `tiptop …`（**0.2.0 起**：仓库提供 21 条 task 模板 + 交互式生成脚本 `scripts/zed/`） | Z-P1-2 |
+| 资料采集/导入/局部同步（link 5 条 + schema 11 条） | ✅ | ❌ | ⬇️ task 调 `tiptop …`（**0.2.0 起**：仓库提供 22 条 task 模板 + 交互式生成脚本 `scripts/zed/`） | Z-P1-2 |
 | 只读查询（状态/表清单/列清单/链接关系/目标列表/预演） | ✅ | ❌ | ✅ **0.2.0 已落地**：9 条 slash command（读 `.project/` 资料；`/bdl-deploy-dry-run` 调 CLI） | Z-P1-1 |
 | 上传/下载/预演上传（单文件） | ✅ | ❌ | ⬇️ task（`$ZED_RELATIVE_FILE` + `"save": "current"`；0.2.0 起由生成脚本产出） | Z-P1-2 |
 | 编译/链接/预览（生产端执行，6 条） | ✅ | ❌ | ⬇️ task 调 `tiptop exec`（`-region` / `-login-profile` 由生成脚本按区写入） | Z-P1-2 |
 | 整包部署（预演/列目标/执行） | ✅ CLI 用法 | ❌ | ⬇️ task 调 `tiptop deploy`；只读的预演/列目标另有 slash command | Z-P1-1 / Z-P1-2 |
 | 项目初始化（拉代码） | ✅ 向导 + 集成终端 | ❌ | ⬇️ task 调 `scripts/init-project` 同款脚本（终端内交互；生成脚本可写入） | Z-P1-2 |
-| 迁移旧资料目录（`.link/` → `.project/link/`） | ✅ 命令 | ❌ | ⬇️ task：移动文件的小脚本（不覆盖已有文件）——**未在 0.2.0 生成脚本里产出**，见 P2 | Z-P2-2 |
+| 迁移旧资料目录（`.link/` → `.project/link/`） | ✅ 命令 | ❌ | ✅ **0.2.0 已落地**：生成脚本产出 `.zed/bdl/migrate-data.{sh,ps1}` + task（只搬移、绝不覆盖，空旧目录顺手删） | Z-P2-2 |
 | 反查引用程序 | ✅ 视图分页 | ❌ | ⬇️ **函数级反查**，落到 Code Lens / `executeCommand` | Z-P3-2 / Z-P3-3 |
 | 进度通知 + 取消 | ✅ | ❌ | ⬇️ task 终端原样输出 + 重跑取消（生成脚本已给 6 条 exec + deploy 加 `allow_concurrent_runs`） | Z-P1-2 |
 
@@ -344,7 +344,7 @@ cargo build --release --target wasm32-wasip2
 > （格式已从宿主 `ExtensionManifest`/`capabilities.rs` 核实）、
 > `scripts/zed/init-workspace.{sh,ps1}`（20 固定 + 1 可选 task；bash 版实跑通过，
 > ps1 本机无 pwsh 未实跑、留 CI）、`/bdl-env-check` 深度版。
-> 新增护栏 `tests/verify-init-script.py`（原 9 项；Z-P2-4 后 11 项，含 deploy.json 两个场景）。
+> 新增护栏 `tests/verify-init-script.py`（原 9 项；Z-P2-2/Z-P2-4 后 13 项：deploy.json 两场景 + 迁移 helper）。
 > 护栏：清单 17 项 ✓ · init-script 9 项 ✓ · query 47 项 ✓ · `cargo test` 6 项 ✓ · wasm 274 KB ✓。
 > 仍待**实机验收**：§11.2 #8–#10c（slash/task/capability/生成脚本）。
 
@@ -362,7 +362,7 @@ cargo build --release --target wasm32-wasip2
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|
 | **Z-P2-1** | **Code Lens 实机验证（必须先做）**：① `code_lens: "on"` 时同一 range 的多条 lens 是否**各占一行**；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件；③ 决定了实现方式后再投入 Z-P3-3 | 需要**有 GUI 的机器**；结论回写本文件与 USER-GUIDE | 三条结论有截图/录屏；若②不成立，改用备选方案（终端清单 + `lsp command selector`）并更新 §8 | 本文件 + USER-GUIDE |
-| **Z-P2-2** | 链接关系视图的替代：① ✅ **已落地** slash command `/bdl-link-chain <代码>`（读 `links.jsonl`，Agent 面板文本；最多 30 个文件）——比终端清单跨平台、可单测；② 待做：**迁移旧资料目录**（`.link/` → `.project/link/` 等）的 task/脚本（0.2.0 未产出） | `src/project.rs`、`scripts/zed/**`、文档 | ①✅ 单测覆盖（命中 / 未命中 / 大小写 / 带后缀）；②待做：迁移不覆盖已有文件并打印搬了什么 | `src/project.rs`、`scripts/zed/**`、文档 |
+| **Z-P2-2** ✅ | 链接关系视图的替代 + 旧资料目录迁移：① slash command `/bdl-link-chain <代码>`（读 `links.jsonl`，Agent 面板文本；最多 30 个文件）——比终端清单跨平台、可单测；② 生成脚本产出 `.zed/bdl/migrate-data.{sh,ps1}` + task「4gl: 迁移项目资料目录」，**只搬移、绝不覆盖**（`.link/`→`.project/link/`、`.project/.schema/`→`.project/schema/`、`.project/deploy.json`/`.bdl-lsp/deploy.json`→`.project/deploy/deploy.json`，空旧目录删除） | `src/project.rs`、`scripts/zed/**`、文档 | ①✅ 单测覆盖（命中/未命中/大小写/带后缀）；②✅ `verify-init-script.py` 场景三：搬移成功、目标已存在时**原文件保留**、旧空目录删除 | `src/project.rs`、`scripts/zed/**`、文档 |
 | **Z-P2-3** | 字段资料只读列表（slash）与 `RECORD LIKE` 体验文档化 | `src/lib.rs`、`docs/USER-GUIDE.md` | `/bdl-schema-tables`、`/bdl-schema-columns` 输出正确 | `src/lib.rs`、USER-GUIDE |
 | **Z-P2-4** | **让 `ext.*` 真正生效**（本轮盘点发现的空档）：① 生成脚本按问答**合成 `.project/deploy/deploy.json`**（对应 VSCode `deployconfig.ts` 的 `ensureDeployConfig`）—— ✅ **已完成**（bash + ps1 两个脚本；`verify-init-script.py` 两个场景覆盖"生成 / 已存在写 `.bdl-new`"）；② 生成脚本回读 `ext.build.*` 模板（否则这些键没有消费者）；③ 可选：`ext.deploy.enable=false` 时 `/bdl-deploy-*` 给提示 | `scripts/zed/**`、文档 | ①✅ 填了生产环境的项目能直接 `tiptop upload/download/deploy`；②待做：模板改 `ext.build.*` 后重跑生成脚本能得到新命令 | `scripts/zed/**`、文档 |
 
@@ -474,7 +474,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
 cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py                     # 初始化脚本产物 11 项（R12 无 ${…}、task 齐全、deploy.json、不写密码）
+python3 tests/verify-init-script.py                     # 初始化脚本产物 13 项（R12 无 ${…}、task 齐全、deploy.json、迁移 helper、不写密码）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
 cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-wasip2/release/zed_bdl.wasm
@@ -496,7 +496,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | 8 | slash command | `/bdl-env-check`、`/bdl-schema-status`、`/bdl-schema-tables`、`/bdl-schema-columns` 在 Agent 面板有响应、文本正确；无资料时给引导文案而不是报错 | P1 |
 | 9 | task | 链接资料状态 / 全量更新 / 上传当前文件 / 预演上传 / 下载当前文件 / 4GL 编译 / Form 预览 | P1 |
 | 10 | 初始化工程脚本 | `bash .zed/bdl/init-workspace.sh` 生成 `.zed/{settings.json,tasks.json,bdl-tool.json}` 且内容正确（Windows 用 `.ps1`） | P1 |
-| 10b | **task 没被变量过滤** | `task: spawn` 列表里能看到全部 20 条 `4gl:` task（**尤其 6 条 exec**：它们的 `-command` 里含 Zed 变量，写错会被过滤掉）；已存在的 `settings.json` 不被覆盖（写 `.bdl-new`） | P1 |
+| 10b | **task 没被变量过滤** | `task: spawn` 列表里能看到全部 21 条 `4gl:` task（**尤其 6 条 exec**：它们的 `-command` 里含 Zed 变量，写错会被过滤掉）；已存在的 `settings.json` 不被覆盖（写 `.bdl-new`） | P1 |
 | 10c | capability | 首次使用 slash command 触发 `process:exec` 时，Zed **不会**报 "capability ... was not listed in the extension manifest"；若用户收紧了 `granted_extension_capabilities`，按文档放行同形状 | P1 |
 | 11 | **Code Lens ①** | 开 `code_lens: "on"`：同一 range 的多条 lens **各占一行** | P2（先验证） |
 | 12 | **Code Lens ②** | 点击 lens 的 command 能执行并打开目标文件 | P2（先验证） |
