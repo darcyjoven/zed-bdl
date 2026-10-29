@@ -486,7 +486,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
 cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py                     # 初始化脚本产物 14 项（R12 无 ${…}、task 齐全、deploy.json、迁移 helper、ext.build 覆盖）
+python3 tests/verify-init-script.py                     # 初始化脚本产物 15 项（R12 无 ${…}、task 齐全、字段白名单、deploy.json、迁移 helper、ext.build 覆盖）
 python3 tests/verify-docs.py                            # 文档契约 9 项（版本三处一致 / 命令条数与护栏数字对拍 / 无过期引用）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
@@ -554,7 +554,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > Z-P3-5 ✅（bdl-lsp/tiptop 文档已同步）；**Z-P3-1 / Z-P3-3 / Z-P3-6 待确认或待实机** ·
 > 第五轮 ✅（`90ae4d8`/`0c0cdf9`）· 第六轮待实机验收（由用户执行 §11.2 清单）。
 >
-> 护栏现状：清单 **17** 项 · init-script **14** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 315 KB。
+> 护栏现状：清单 **17** 项 · init-script **15** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 315 KB。
 
 ```text
 【第一轮 · 只改本仓库，零外部依赖】

@@ -191,6 +191,35 @@ def check_products(root: Path, shell: str) -> None:
         else:
             ok(f"[{shell}] 6 条 exec task 都带 -region")
 
+    # 字段白名单：Zed 的 task schema（docs/tasks.md）。生成脚本写错字段名时
+    # Zed 不会报错，只会"这条 task 的行为不对"，必须静态拦下。
+    allowed = {
+        "label", "command", "args", "env", "cwd", "use_new_terminal",
+        "allow_concurrent_runs", "reveal", "hide", "shell", "show_summary",
+        "show_command", "save", "tags", "hooks",
+    }
+    enum_checks = {
+        "save": {"all", "current", "none"},
+        "reveal": {"always", "no_focus", "never"},
+        "hide": {"never", "always", "on_success"},
+    }
+    field_problems = []
+    for task in tasks:
+        unknown = sorted(set(task) - allowed)
+        if unknown:
+            field_problems.append(f"{task.get('label')}: 未知字段 {unknown}")
+        for key, values in enum_checks.items():
+            if key in task and task[key] not in values:
+                field_problems.append(f"{task.get('label')}: {key}={task[key]!r} 不在 {sorted(values)}")
+        for required in ("label", "command", "cwd"):
+            if required not in task:
+                field_problems.append(f"{task.get('label')}: 缺 {required}")
+    if field_problems:
+        for problem in field_problems:
+            fail(f"[{shell}] task 字段不合法：{problem}")
+    else:
+        ok(f"[{shell}] {len(tasks)} 条 task 的字段都在 Zed schema 白名单内（save/reveal/hide 取值也合法）")
+
     s = settings.get("lsp", {}).get("bdl-lsp", {}).get("settings", {})
     modes = (s.get("link", {}).get("mode"), s.get("schema", {}).get("mode"))
     if modes == ("off", "off"):
