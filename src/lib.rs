@@ -18,6 +18,7 @@
 
 mod binary;
 mod config;
+mod download;
 mod project;
 mod slash;
 
@@ -32,11 +33,11 @@ impl zed::Extension for BdlExtension {
 
     fn language_server_command(
         &mut self,
-        _language_server_id: &zed::LanguageServerId,
+        language_server_id: &zed::LanguageServerId,
         worktree: &zed::Worktree,
     ) -> zed::Result<zed::Command> {
         let settings = config::load(worktree);
-        binary::resolve_lsp(worktree, &settings)
+        binary::resolve_lsp(worktree, &settings, Some(language_server_id))
     }
 
     /// 启动时下发的有效配置。

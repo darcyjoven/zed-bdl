@@ -234,7 +234,7 @@ zed.dev 官方语义：
 用户在 `.zed/settings.json` 只写一处 `lsp.bdl-lsp.settings`：
 
 - **发往 `bdl-lsp` 的键（无 `bdl.` 前缀）**：`generoVersion`、`logLevel`、`globals`、`perRoots`、`diagnostics`、`builtins`、`link{mode,dataDir,moduleRoots,globalModules}`、`schema{mode,dataDir}`、`index`、`ignore`、`format`、`limits`。
-- **仅 Zed 扩展自用（不下发）**：`ext.tools.path`、`ext.schema.{batchSize,timeoutSec}`、`ext.prod.oracle.*`、`ext.prod.deploy.*`、`ext.deploy.enable`、`ext.build.{enable,4gl.*,per.*}`、`ext.download.bdlLsp`。
+- **仅 Zed 扩展自用（不下发）**：`ext.tools.path`、`ext.schema.{batchSize,timeoutSec}`、`ext.prod.oracle.*`、`ext.prod.deploy.*`、`ext.deploy.enable`、`ext.build.{enable,4gl.*,per.*}`、`ext.download.{bdlLsp,tiptop}`。
   语言服务器日志级别统一用下发的 `logLevel`（`logLevel != "info"` 时扩展同时把它作为 `serve --log-level <级别>` 参数，与 VSCode 侧一致）。
 - 兼容路径：`lsp.bdl-lsp.initialization_options` 仍可用（优先级最高，作为逃生口）；`binary.path` / `binary.arguments` / `binary.env` 沿用 Zed 原生。
 
@@ -296,7 +296,7 @@ zed.dev 官方语义：
 
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
-| 二进制内置（平台包） | ✅ | ❌ | 🔧 运行时自动下载（`latest_github_release` → 平台资产 → `download_file` → `make_file_executable`） | Z-P4-1 / Z-P4-2 |
+| 二进制内置（平台包） | ✅ | ❌ | ✅ **Z-P4-1 已落地**（`bdl-lsp` 自动下载；本地已有则优先不下载）；`tiptop` 侧等 Z-P3-4 的 Release | Z-P4-1 / Z-P4-2 |
 | `bdl-lsp` Release | — | ✅ 已有 v0.3.14 + 四平台 + SHA256SUMS | 直接可用 | — |
 | `tiptop` Release | — | ❌ 无 tag / 无 release workflow | 🔒 仿 `bdl-lsp/release.yml` 加发布流水线 | Z-P3-4 |
 | 下载状态反馈 | ✅ 进度条 | ❌ | 🔧 `set_language_server_installation_status` + slash 文本 | Z-P4-3 |
@@ -379,6 +379,13 @@ cargo build --release --target wasm32-wasip2
 | ~~Z-P3-7~~ | `vscode-bdl/docs/TODO.md` §3.5 Zed 章节更新 | `vscode-bdl` | **未授权**（用户只授权了 bdl-lsp/tiptop）；需要时单独确认，或由本文件取代 | — |
 
 ### P4 · 无感分发（只改本仓库）
+
+> **进展（2026-10-29）**：**Z-P4-1 已落地**（`src/download.rs`：`latest_github_release` →
+> 平台资产名 → `download_file` → `make_file_executable` → 清旧版本目录；四级本地查找全落空才下载；
+> `ext.download.bdlLsp=off` 可关；`set_language_server_installation_status` 三态上报；
+> 资产名已对 `api.github.com` 实测（`bdl-lsp-linux-amd64.tar.gz` 等 4 个 + SHA256SUMS 均存在），
+> 新增 2 个单测）。**Z-P4-2 代码已就绪但被封在 Z-P3-4（tiptop 还没 Release）之后**。
+> 待实机：§11.2 #16。
 
 | # | 任务 | 落点 | 验收 | 依赖 |
 |---|---|---|---|---|

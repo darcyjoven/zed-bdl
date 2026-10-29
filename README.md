@@ -57,7 +57,21 @@ Zed 命令面板 → zed: install dev extension → 选择本仓库目录
 
 `bdl-lsp`（语言服务器）与 `tiptop`（资料/部署 CLI）二选一：
 
-**① 自动下载（计划中，`0.2.0` 以后）** —— 打开 `.4gl` 时按平台下载到扩展目录，无需手工操作。
+**① 自动下载【`0.2.0` 起，`bdl-lsp` 已可用】** —— 四级本地查找全部落空时，扩展按平台从 GitHub Release
+下载、解包到扩展目录、设置可执行位，并清掉同前缀的旧版本目录：
+
+| 平台 | 资产 |
+|---|---|
+| Linux x64 | `bdl-lsp-linux-amd64.tar.gz` |
+| macOS Intel / Apple Silicon | `bdl-lsp-darwin-amd64.tar.gz` / `bdl-lsp-darwin-arm64.tar.gz` |
+| Windows x64 | `bdl-lsp-windows-amd64.zip` |
+
+- **本地已有二进制时不会下载**（用户装的优先；下载只作第 5 级兜底）。
+- 状态显示在 Zed 的语言服务器状态里（检查更新 / 下载中 / 失败原因 + 可操作提示）。
+- 关闭：`lsp.bdl-lsp.settings.ext.download.bdlLsp = "off"`（键缺省即 `auto`）。
+- `tiptop` 的自动下载（`ext.download.tiptop`）**代码已就绪，但需要 tiptop 先有 Release**（PLAN Z-P3-4）。
+- 首次使用会用到 `download_file` capability；若你收紧了 `granted_extension_capabilities`，
+  需要放行 `host = "github.com"`、`path = ["darcyjoven", "**"]`。
 
 **② 手工构建（当前可行）**
 

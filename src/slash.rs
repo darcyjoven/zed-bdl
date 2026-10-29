@@ -135,7 +135,7 @@ fn env_check(worktree: &zed::Worktree, settings: &config::Settings) -> String {
         }
         Err(err) => push(&mut out, "tiptop", &format!("找不到：{err}")),
     }
-    match binary::resolve_lsp(worktree, settings) {
+    match binary::resolve_lsp(worktree, settings, None) {
         Ok(cmd) => {
             let version = cli_text(&cmd.command, &["version"]);
             push(&mut out, "bdl-lsp", &format!("{}  [{version}]", cmd.command));

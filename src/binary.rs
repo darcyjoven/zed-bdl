@@ -32,7 +32,13 @@ fn exe_name(base: &str) -> String {
 }
 
 /// 解析语言服务器命令。
-pub fn resolve_lsp(worktree: &zed::Worktree, settings: &Settings) -> zed::Result<zed::Command> {
+///
+/// 顺序：显式设置 → 环境变量 → 工作区 `.bdl-lsp/bin/` → `PATH` → **运行时下载**（兜底）。
+pub fn resolve_lsp(
+    worktree: &zed::Worktree,
+    settings: &Settings,
+    server_id: Option<&zed::LanguageServerId>,
+) -> zed::Result<zed::Command> {
     let name = exe_name(LSP);
     let mut args = settings.arguments.clone();
     if !args.iter().any(|a| a == "--log-level" || a == "-log-level") {
@@ -92,22 +98,41 @@ pub fn resolve_lsp(worktree: &zed::Worktree, settings: &Settings) -> zed::Result
         });
     }
 
-    Err(format!(
-        "找不到 {name}。\n\
-         \n\
-         任选一种方式让 Zed 找到它：\n\
-         1. 设置 lsp.bdl-lsp.binary.path 为绝对路径；\n\
-         2. 设置环境变量 BDL_LSP_PATH；\n\
-         3. 把二进制放到 <工作区>/.bdl-lsp/bin/{name}；\n\
-         4. 把二进制所在目录加入 PATH。\n\
-         \n\
-         构建方法（在 bdl-lsp 仓库）：\n\
-         make build            # Linux / macOS\n\
-         scripts\\build.ps1     # Windows"
-    ))
+    // 5. 兜底：运行时下载（无感；用户已装好的二进制永远优先）
+    match crate::download::ensure_lsp(settings, server_id) {
+        Ok(path) => {
+            return Ok(zed::Command {
+                command: path,
+                args,
+                env,
+            })
+        }
+        Err(download_err) => {
+            return Err(format!(
+                "找不到 {name}。\n\
+                 \n\
+                 已尝试的方式：Zed 设置 lsp.bdl-lsp.binary.path → 环境变量 BDL_LSP_PATH → \
+                 <工作区>/.bdl-lsp/bin/{name} → PATH → 自动下载。\n\
+                 \n\
+                 自动下载的结果：{download_err}\n\
+                 \n\
+                 手工准备（任选一种）：\n\
+                 1. 设置 lsp.bdl-lsp.binary.path 为绝对路径；\n\
+                 2. 设置环境变量 BDL_LSP_PATH；\n\
+                 3. 把二进制放到 <工作区>/.bdl-lsp/bin/{name}；\n\
+                 4. 把二进制所在目录加入 PATH。\n\
+                 \n\
+                 构建方法（在 bdl-lsp 仓库）：\n\
+                 make build            # Linux / macOS\n\
+                 scripts\\build.ps1     # Windows"
+            ));
+        }
+    }
 }
 
 /// 解析 `tiptop` 可执行文件路径（供 slash command / task 生成脚本使用）。
+///
+/// 顺序：显式设置 → 环境变量 → 工作区 `.bdl-lsp/bin/` → `PATH` → **运行时下载**（兜底）。
 pub fn resolve_tools(worktree: &zed::Worktree, settings: &Settings) -> zed::Result<String> {
     let name = exe_name(TOOLS);
 
@@ -138,19 +163,27 @@ pub fn resolve_tools(worktree: &zed::Worktree, settings: &Settings) -> zed::Resu
         return Ok(path);
     }
 
-    Err(format!(
-        "找不到 {name}（资料采集 / 上传 / 编译都依赖它）。\n\
-         \n\
-         任选一种方式：\n\
-         1. 设置 lsp.bdl-lsp.settings.ext.tools.path 为绝对路径；\n\
-         2. 设置环境变量 TIPTOP_PATH；\n\
-         3. 把二进制放到 <工作区>/.bdl-lsp/bin/{name}；\n\
-         4. 把二进制所在目录加入 PATH。\n\
-         \n\
-         构建方法（在 tiptop 仓库）：\n\
-         make build            # Linux / macOS\n\
-         scripts\\build.ps1     # Windows"
-    ))
+    // 5. 兜底：运行时下载（依赖 tiptop 自己的 Release，见 PLAN Z-P3-4）
+    match crate::download::ensure_tools(settings) {
+        Ok(path) => Ok(path),
+        Err(download_err) => Err(format!(
+            "找不到 {name}（资料采集 / 上传 / 编译都依赖它）。\n\
+             \n\
+             已尝试：ext.tools.path → 环境变量 TIPTOP_PATH → <工作区>/.bdl-lsp/bin/{name} → PATH → 自动下载。\n\
+             \n\
+             自动下载的结果：{download_err}\n\
+             \n\
+             手工准备（任选一种）：\n\
+             1. 设置 lsp.bdl-lsp.settings.ext.tools.path 为绝对路径；\n\
+             2. 设置环境变量 TIPTOP_PATH；\n\
+             3. 把二进制放到 <工作区>/.bdl-lsp/bin/{name}；\n\
+             4. 把二进制所在目录加入 PATH。\n\
+             \n\
+             构建方法（在 tiptop 仓库）：\n\
+             make build            # Linux / macOS\n\
+             scripts\\build.ps1     # Windows"
+        )),
+    }
 }
 
 /// 读一个非空环境变量。
