@@ -282,10 +282,11 @@ tiptop deploy -list
 
 ```bash
 cd zed-extension
-python3 tests/verify-manifest.py        # 清单校验（id / 版本 / grammar rev / 语言映射）
+python3 tests/verify-manifest.py        # 清单 17 项（id/版本/grammar rev/语言映射/语义规则/slash 声明）
 export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
-node tests/verify-queries.mjs           # query 校验（节点名 / 关键字覆盖 / 真实语料编译）
+node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字覆盖 / 真实语料编译）
+cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认）
 cargo build --release --target wasm32-wasip2
 ```
 

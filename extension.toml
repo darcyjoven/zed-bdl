@@ -1,7 +1,7 @@
 id = "4gl-full"
 name = "Genero BDL & Form (Full)"
 schema_version = 1
-version = "0.1.1"
+version = "0.2.0"
 authors = ["darcy <darcy_joven@live.com>"]
 description = "Genero BDL (.4gl/.global) and Form (.per) support: syntax highlighting, outline, brackets, indentation, and a full LSP (navigation, hover, diagnostics)."
 repository = "https://github.com/darcyjoven/zed-bdl"

@@ -13,17 +13,34 @@
   4. language_servers[*].languages 里提到的语言名都真实存在；
   5. language_servers[*].language_ids 的 key 是已声明的语言名；
   6. 每个 language 的 grammar 字段都能在 [grammars] 里找到；
-  7. 每个 language 目录必须至少有 config.toml 与 highlights.scm。
+  7. 每个 language 目录必须至少有 config.toml 与 highlights.scm；
+  8. 每个 language 目录的 semantic_token_rules.json 合法，
+     且 token_type / token_modifiers 都在 bdl-lsp 的 legend 里；
+  9. [slash_commands.*] 声明与 src/ 里的 SLASH_COMMANDS 常量一一对应
+     （写错名字不会编译失败、只会静默不响应，所以必须静态拦下）。
 
 用法：
   python3 tests/verify-manifest.py
 """
+import json
 import re
 import sys
 import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# bdl-lsp 的语义 token legend（权威来源：bdl-lsp/internal/server/semtok.go:36-71）。
+# 顺序即 data 里的下标，扩展的 rules 只允许引用这里有的名字。
+LEGEND_TYPES = {
+    "variable",
+    "parameter",
+    "function",
+    "struct",
+    "property",
+    "keyword",
+}
+LEGEND_MODIFIERS = {"declaration", "readonly", "static"}
 
 checks = 0
 failures = 0
@@ -132,6 +149,60 @@ def main() -> int:
             if suffix.startswith("."):
                 fail(f"languages/{d.name}: path_suffixes 不能带前导点：{suffix!r}")
 
+        # 8. 扩展级语义高亮规则
+        rules_path = d / "semantic_token_rules.json"
+        if not rules_path.is_file():
+            fail(f"languages/{d.name}/ 缺少 semantic_token_rules.json")
+        else:
+            try:
+                rules = json.loads(rules_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                fail(f"languages/{d.name}/semantic_token_rules.json 读不出：{exc}")
+                rules = None
+            if rules is not None:
+                if not isinstance(rules, list) or not rules:
+                    fail(
+                        f"languages/{d.name}/semantic_token_rules.json 必须是非空数组"
+                    )
+                else:
+                    problems = []
+                    for i, rule in enumerate(rules):
+                        if not isinstance(rule, dict):
+                            problems.append(f"#{i} 不是对象")
+                            continue
+                        token_type = rule.get("token_type")
+                        if token_type not in LEGEND_TYPES:
+                            problems.append(
+                                f"#{i} token_type={token_type!r} 不在 bdl-lsp legend 里"
+                            )
+                        modifiers = rule.get("token_modifiers")
+                        if modifiers is not None and (
+                            not isinstance(modifiers, list)
+                            or any(m not in LEGEND_MODIFIERS for m in modifiers)
+                        ):
+                            problems.append(
+                                f"#{i} token_modifiers={modifiers!r} 不在 legend 里"
+                            )
+                        style = rule.get("style")
+                        if (
+                            not isinstance(style, list)
+                            or not style
+                            or any(
+                                not isinstance(s, str) or not s.strip() for s in style
+                            )
+                        ):
+                            problems.append(
+                                f"#{i} style 必须是非空字符串数组（可写多个做主题回退）"
+                            )
+                    if problems:
+                        for p in problems:
+                            fail(f"semantic_token_rules[{d.name}] {p}")
+                    else:
+                        ok(
+                            f"languages/{d.name}: semantic_token_rules.json 合法"
+                            f"（{len(rules)} 条规则）"
+                        )
+
     if declared:
         ok(f"共 {len(declared)} 个语言：{', '.join(sorted(declared))}")
 
@@ -163,6 +234,32 @@ def main() -> int:
                     f"{value!r}"
                 )
         ok(f"language_servers.{ls_name}: {langs}")
+
+    # 9. slash command：extension.toml 声明 ↔ Rust 侧 SLASH_COMMANDS
+    #    写错名字的后果是"编译通过、命令静默不响应"，所以必须静态拦下。
+    declared_cmds = set(manifest.get("slash_commands", {}) or {})
+    for cmd, spec in (manifest.get("slash_commands", {}) or {}).items():
+        if not (spec or {}).get("description"):
+            fail(f"slash_commands.{cmd} 缺少 description（Zed 清单要求）")
+
+    rust_src = "\n".join(
+        p.read_text(encoding="utf-8") for p in sorted((ROOT / "src").glob("*.rs"))
+    )
+    match = re.search(
+        r"SLASH_COMMANDS\s*:\s*&\[&str\]\s*=\s*&\[(.*?)\]\s*;", rust_src, re.S
+    )
+    rust_cmds = set(re.findall(r'"([^"]+)"', match.group(1))) if match else set()
+
+    if not declared_cmds and not rust_cmds:
+        ok("未声明 slash command（P1 落地后本项自动生效）")
+    elif declared_cmds != rust_cmds:
+        fail(
+            "slash command 声明与 src/ 的 SLASH_COMMANDS 不一致："
+            f"仅声明 {sorted(declared_cmds - rust_cmds)}，"
+            f"仅 Rust {sorted(rust_cmds - declared_cmds)}"
+        )
+    else:
+        ok(f"slash command 声明与 Rust 一致（{len(declared_cmds)} 条）：{sorted(declared_cmds)}")
 
     print()
     if failures == 0:

@@ -47,6 +47,10 @@ jobs:
         working-directory: zed-extension
         run: cargo check --target wasm32-wasip2
 
+      - name: 单元测试（宿主机 target：配置合并等纯逻辑）
+        working-directory: zed-extension
+        run: cargo test
+
       - name: 发布构建
         working-directory: zed-extension
         run: cargo build --release --target wasm32-wasip2

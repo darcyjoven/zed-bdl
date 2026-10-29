@@ -50,7 +50,7 @@
 | `vscode-bdl`（4gl-full） | **0.9.2**，`bin/` 内置 `bdl-lsp` + `tiptop`，33 命令 / 50 设置键 / 2 视图 / 55 条 menus / 27 activationEvents / 0 keybindings | `vscode-extension/package.json:2,5,60,531-1019` |
 | `bdl-lsp` | 源码 **0.3.14**，tag `v0.3.14`，`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS` | `bdl-lsp/main.go:35`、`release.yml` |
 | `tiptop` | 源码 **0.1.10**，**无 tag、无 release workflow**，CI 只有 `build.yml` | `tiptop/main.go:40`、`.github/workflows/` |
-| `zed-bdl`（本仓库） | **0.1.1**；`src/lib.rs` 仅 192 行 / 4 个 trait 方法；10 个 `.scm`；14 项清单校验 + 47 项 query 校验 | `extension.toml:4`、`Cargo.toml:3` |
+| `zed-bdl`（本仓库） | **0.2.0**（P0 已落地）；`src/` 拆为 `lib.rs` + `config.rs` + `binary.rs`；10 个 `.scm`；**17 项**清单校验 + 47 项 query 校验 + 3 个单元测试 | `extension.toml:4`、`Cargo.toml:3`、`tests/` |
 | 本地已构建二进制 | `bdl-lsp 0.3.13`、`tiptop 0.1.8` —— **都过期**，`tiptop` 旧二进制缺 `download` / `-region` / `-login-profile` | 实跑 `artifacts/bin/* version` |
 
 ### 1.2 事实来源（本计划所有数字与结论的可核对出处）
@@ -312,6 +312,10 @@ zed.dev 官方语义：
 
 ### P0 · 配置地基与文档（只改本仓库，立即做）
 
+> **进展（2026-10-29）**：Z-P0-1…Z-P0-6 **代码与文档已落地**，版本 **0.2.0**；
+> 护栏全绿（清单 17 项 / query 47 项 / `cargo test` 3 项 / wasm 构建 198 KB）。
+> 仍待**实机验收**：§11.2 #1–#7、#19（本沙箱无 GUI，验不了 UI 行为）。
+
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|
 | **Z-P0-1** | 三份文档重建（本文件 + `README.md` + `docs/USER-GUIDE.md`），全部口径对齐 0.9.2/v0.3.14/0.1.10 | `docs/PLAN.md`、`README.md`、`docs/USER-GUIDE.md` | 三份文档互相引用一致；全文无 `bdl-lsp link`/`bdl-lsp deploy`/`link.maxAgeDays`/`link.sync.*` | 三份文档 |
@@ -319,7 +323,7 @@ zed.dev 官方语义：
 | **Z-P0-3** | **配置下发修正**：`language_server_initialization_options` 返回「默认值 ⊕ `settings`(去掉 `ext`) ⊕ `initialization_options`」，并补 `link.mode="off"`、`schema.mode="off"`；`language_server_workspace_configuration` 返回同一份；`logLevel != "info"` 时同时作为 `serve --log-level` 参数 | `src/lib.rs` | 空设置时服务端拿到 `mode:"off"`（对照 `bdl-lsp` 的 `LinkEnabled`）；用户在 `settings` 里写的 `diagnostics`/`format` 生效；`ext` 不下发；`--log-level` 与 VSCode 一致 | `src/lib.rs` |
 | **Z-P0-4** | 语义高亮规则：`languages/bdl/semantic_token_rules.json` + `languages/per/semantic_token_rules.json`（按 bdl-lsp legend：`variable/parameter/function/struct/property/keyword`） | 两个语言目录 + `verify-manifest.py` | 新文件被校验；开 `semantic_tokens: "combined"` 后自定义符号着色（实机） | `languages/**`、`tests/verify-manifest.py` |
 | **Z-P0-5** | 二进制定位扩展：新增 `tiptop` 四级查找（`ext.tools.path` → `TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/tiptop[.exe]` → `PATH`），错误文案可操作 | `src/lib.rs`（抽 `binary.rs` 亦可） | 找不到时有可操作提示；与 `bdl-lsp` 的查找语义一致 | `src/lib.rs` |
-| **Z-P0-6** | 校验脚本扩展：`verify-manifest.py` 增加「`[slash_commands.*]` 声明 ↔ Rust `match command.name` 分支一一对应」「`semantic_token_rules.json` 存在且 token_type 属于 legend」 | `tests/verify-manifest.py` | 故意写错命令名时校验失败 | `tests/verify-manifest.py` |
+| **Z-P0-6** | 校验脚本扩展：`verify-manifest.py` 增加「`[slash_commands.*]` 声明 ↔ `src/` 的 `SLASH_COMMANDS` 常量一一对应」「`semantic_token_rules.json` 存在且 token_type/modifiers 属于 bdl-lsp legend」「`slash_commands` 必须有 description」 | `tests/verify-manifest.py` | 故意写错命令名/规则名时校验失败（14 项 → 17 项） | `tests/verify-manifest.py` |
 
 **P0 验收门槛（任何提交前必过）**
 
@@ -446,10 +450,11 @@ cargo build --release --target wasm32-wasip2
 
 ```bash
 cd /code/workspace/zed-extension
-python3 tests/verify-manifest.py                       # 清单 14 项（P0-6 后 +命令声明/语义规则校验）
+python3 tests/verify-manifest.py                       # 清单 17 项（含语义规则 / slash 声明一致性）
 export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
+cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
 cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-wasip2/release/zed_bdl.wasm
