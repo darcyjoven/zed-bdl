@@ -261,7 +261,7 @@ zed.dev 官方语义：
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
 | 诊断/悬停/跳转/引用/补全/重命名/Code Action/格式化 | ✅ | ✅ 同一个 `bdl-lsp` | ✅ | — |
-| 项目符号搜索（工作区索引） | ✅ `Ctrl+T` | ⚠️ 服务端实现了 `workspace/symbol` 但**未声明 capability** | ⚠️ 待实机核实；若不生效需 `bdl-lsp` 补 `workspaceSymbolProvider`（§10.2） | Z-P3-6 |
+| 项目符号搜索（工作区索引） | ✅ `Ctrl+T` | ❌ 服务端实现了 `workspace/symbol`，但**未声明 `workspaceSymbolProvider`**；Zed 对 `None` 的 server **直接跳过**（源码 `crates/project/src/lsp_store.rs:9438-9447`） | 🔒 需 `bdl-lsp` 补一行 `WorkspaceSymbolProvider: true`（**已由源码证实，不再是猜测**；等待授权） | Z-P3-6 |
 | 语义高亮 | ✅ 默认开 | ⚠️ Zed 默认 `off`，扩展规则文件**已加**（0.2.0） | ✅ 落地；文档教开 `semantic_tokens: "combined"`；着色效果待实机（§11.2 #6） | Z-P0-4 |
 | 设置是否生效 | ✅ | ❌ 未到服务端 | ✅ **0.2.0 已修**：有效配置从 `initializationOptions` 下发 + 补 `mode:"off"` 默认；待实机（§11.2 #4/#5） | Z-P0-3 |
 | 设置热更新 | ✅ `didChangeConfiguration` | ❌ 扩展发不了；改配置需重启服务器 | 🔒⚠️ 服务端支持 `workspace/configuration` 后由 Zed 原生通道热更新（**待确认**） | Z-P3-1 |
@@ -383,7 +383,7 @@ cargo build --release --target wasm32-wasip2
 | **Z-P3-3** | `textDocument/codeLens`（**与 VSCode 侧 P1-8 同一份实现，两端共用**） | `bdl-lsp` | 链内子文件各一条 lens 挂 **MAIN 头上**（数据来自 `link.Resolver.Tree()`，纯内存）；上限 `bdl.link.lensMax`（默认 10）+ 汇总行；函数级反查用 `wsindex.CallsOf` | 协议级测试；Zed 实机按 Z-P2-1 的结论渲染/点击；VSCode 侧作为 TreeView 的补充视图 |
 | **Z-P3-4** ✅ | tag + 四平台 Release | `tiptop` | **已完成**：新增 `release.yml`（tag `v*` + dispatch，四平台原生 runner，检出兄弟目录 bdl-lsp；ref = 显式输入 > bdl-lsp 最近 Release tag > main），已打 **v0.1.10** 并推送 | ✅ Release v0.1.10 实测有 4 个产物 + `SHA256SUMS`；下载校验和通过、`tiptop version` = 0.1.10、`download`/`exec` 子命令在 |
 | **Z-P3-5** | 文档同步 | `bdl-lsp` / `tiptop` | `FEATURES.md` 补 `workspace/configuration`、`executeCommand`、Code Lens 行；`tiptop` 补 Release | 两处口径一致 |
-| ~~Z-P3-6~~ | ⚠️**待确认**：声明 `workspaceSymbolProvider: true` | `bdl-lsp` | 服务端已实现 `workspace/symbol`，但 `InitializeResult` 没声明该 capability；Zed 的「项目符号」可能因此不生效 | 一行修复 + 实机核实（§11.2 #19）；**先核实再改** |
+| ~~Z-P3-6~~ | ⚠️**待授权**（证据已确凿）：声明 `workspaceSymbolProvider: true` | `bdl-lsp` | 服务端已实现 `workspace/symbol`，但 `InitializeResult` 没声明该 capability。Zed 源码里 `workspace_symbol_provider: None` → **continue（跳过该 server）**（`crates/project/src/lsp_store.rs:9438-9447`）→ 项目符号搜不到 BDL 函数 | 一行修复；改完按 §11.2 #19 复验（不再是"先核实要不要改"，而是"改完就能搜到"） |
 | ~~Z-P3-7~~ | `vscode-bdl/docs/TODO.md` §3.5 Zed 章节更新 | `vscode-bdl` | **未授权**（用户只授权了 bdl-lsp/tiptop）；需要时单独确认，或由本文件取代 | — |
 
 ### P4 · 无感分发（只改本仓库）
@@ -519,7 +519,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功；删缓存可重下；失败有提示 | P4 |
 | 17 | 路径含空格与中文 | 诊断/跳转/下载/上传均正常（Windows 尤其） | P1/P4 |
 | 18 | ABI 15 ↔ Zed tree-sitter 运行时 | 高亮/outline 正常（若异常，是 grammar 兼容问题，需换 rev） | P0 |
-| 19 | **项目符号搜索** | `project symbols: toggle` 能搜到 BDL 函数；**若搜不到**，确认是否因 `bdl-lsp` 未声明 `workspaceSymbolProvider`（§10.2 待授权项） | P0 |
+| 19 | **项目符号搜索** | `project symbols: toggle` 能搜到 BDL 函数。**已知前提**：`bdl-lsp` 当前未声明 `workspaceSymbolProvider`，Zed 会跳过它（源码已证）→ 本项在 Z-P3-6 修好前**预期就是搜不到**；修完再验 | P3（Z-P3-6） |
 
 > **"CI 绿"≠"装上能用"**：以上 18 项必须在真机勾完才算追平完成。
 

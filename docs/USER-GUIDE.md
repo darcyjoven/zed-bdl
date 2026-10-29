@@ -783,7 +783,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | 能力 | 说明 |
 |---|---|
 | 文件内大纲 | `documentSymbol`；MAIN 程序块的 `detail` 为 `MAIN` |
-| 工作区符号 | `bdl-lsp` 实现了 `workspace/symbol`（后台全工作区索引 + **持久化快照**，覆盖**未打开**的文件），但 `InitializeResult` **没有声明 `workspaceSymbolProvider`** → Zed 的命令面板符号搜索**可能不发这个请求**。已在 PLAN §11.2 #19 列为实机核实项；若确实不生效，需要 `bdl-lsp` 补一行声明（PLAN §10.2 待确认） |
+| 工作区符号 | ❌ **当前在 Zed 里搜不到**：`bdl-lsp` 实现了 `workspace/symbol`（后台全工作区索引 + 持久化快照，覆盖未打开文件），但 `InitializeResult` **没有声明 `workspaceSymbolProvider`**；Zed 的源码对 `None` 的 server 是**直接跳过**（`crates/project/src/lsp_store.rs:9438-9447`）。修法是 `bdl-lsp` 补一行声明（PLAN Z-P3-6，**待授权**）；在那之前，跨文件跳转/引用仍正常，只有「项目符号」看不到 BDL 结果 |
 | 索引开关 | `settings.index.enable`（默认 `true`）；超大仓库或只想编辑单文件时可关 |
 | 性能 | 实测 7756 个文件首次约 **24.7 秒**（后台、不阻塞编辑），之后按 `(mtime,size)` 增量约 **22 毫秒** |
 
