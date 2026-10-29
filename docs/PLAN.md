@@ -387,14 +387,17 @@ cargo build --release --target wasm32-wasip2
 > `ext.download.bdlLsp=off` 可关；`set_language_server_installation_status` 三态上报；
 > 资产名已对 `api.github.com` 实测（`bdl-lsp-linux-amd64.tar.gz` 等 4 个 + SHA256SUMS 均存在），
 > 新增 2 个单测）。**Z-P4-2 也已可用**：tiptop v0.1.10 Release 已发布，同一套 `ensure_tools` 代码路径生效。
+> **Z-P4-3 已落地**（三态安装状态上报）；**Z-P4-4 已落地**：`/bdl-env-check` 会解析
+> `bdl-lsp`/`tiptop` 的 `version` 输出，低于最低要求（0.3.13 / 0.1.10）时给一句升级提醒（不硬拦），
+> 新增 2 个单测（`parse_version` / `version_warning`）。
 > 待实机：§11.2 #16。
 
 | # | 任务 | 落点 | 验收 | 依赖 |
 |---|---|---|---|---|
 | **Z-P4-1** | `bdl-lsp` 自动下载：`latest_github_release` → `current_platform()` 拼资产名（`bdl-lsp-<os>-<arch>.tar.gz|.zip`）→ 缓存到扩展目录 → `make_file_executable` → 清旧版本目录；设置 `ext.download.bdlLsp = auto\|off` | `src/lib.rs` | 无本地二进制时自动下载成功；删缓存后能重下；下载失败给出可操作错误 | bdl-lsp Release（已有） |
 | **Z-P4-2** ✅ | `tiptop` 自动下载（同上，Windows 用 `.zip`） | `src/download.rs` | 与 Z-P4-1 同一实现（`ensure_tools`）；资产名已对 v0.1.10 实测 | Z-P3-4 ✅ |
-| **Z-P4-3** | 下载状态显示：`set_language_server_installation_status`（`CheckingForUpdate` / `Downloading` / `Failed(msg)`） | `src/lib.rs` | 失败时用户能看到原因而不是"服务器起不来" | — |
-| **Z-P4-4** | 版本兼容提示：`/bdl-env-check` 显示三方版本并提示最低要求（矩阵写在文档，不在代码里硬拦） | `src/lib.rs`、USER-GUIDE | 错配时提示清晰 | Z-P1-4 |
+| **Z-P4-3** ✅ | 下载状态显示：`set_language_server_installation_status`（`CheckingForUpdate` / `Downloading` / `Failed(msg)`） | `src/download.rs` | 失败时用户能看到原因而不是"服务器起不来" | Z-P4-1 |
+| **Z-P4-4** ✅ | 版本兼容提示：`/bdl-env-check` 解析两个二进制的 `version` 输出，低于最低要求（`bdl-lsp ≥ 0.3.13`、`tiptop ≥ 0.1.10`）时提醒升级（**不硬拦**，解析不出就不打扰） | `src/slash.rs` | 2 个单测覆盖（版本解析四种写法 / 只在低于最低值时提醒） | Z-P1-4 ✅ |
 | **Z-P4-5**（可选） | `runnables.scm`：把 `MAIN`/`FUNCTION` 标为可运行，标签绑定到编译/链接 task（Zed 的"行内 ▶"替代编辑器按钮） | `languages/bdl/runnables.scm`、文档 | 只在真实可用后再写；需要 `tags` 与 task 对齐 | Z-P1-2 |
 
 ### P5 · 实机验收与发布

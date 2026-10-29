@@ -139,10 +139,14 @@ fn env_check(worktree: &zed::Worktree, settings: &config::Settings) -> String {
     );
 
     // 二进制：路径 + 版本（版本用只读子命令实跑）
+    let mut warnings = Vec::new();
     match binary::resolve_tools(worktree, settings) {
         Ok(path) => {
             let version = cli_text(&path, &["version"]);
             push(&mut out, "tiptop", &format!("{path}  [{version}]"));
+            if let Some(warn) = version_warning("tiptop", &version, MIN_TIPTOP) {
+                warnings.push(warn);
+            }
         }
         Err(err) => push(&mut out, "tiptop", &format!("找不到：{err}")),
     }
@@ -150,8 +154,19 @@ fn env_check(worktree: &zed::Worktree, settings: &config::Settings) -> String {
         Ok(cmd) => {
             let version = cli_text(&cmd.command, &["version"]);
             push(&mut out, "bdl-lsp", &format!("{}  [{version}]", cmd.command));
+            if let Some(warn) = version_warning("bdl-lsp", &version, MIN_BDL_LSP) {
+                warnings.push(warn);
+            }
         }
         Err(err) => push(&mut out, "bdl-lsp", &format!("找不到：{err}")),
+    }
+
+    // Z-P4-4：版本兼容提示（只在低于最低要求时提醒，不做硬拦）。
+    if !warnings.is_empty() {
+        out.push('\n');
+        for warn in &warnings {
+            out.push_str(&format!("⚠️ {warn}\n"));
+        }
     }
 
     // 资料是否存在（只判断文件，不解析全部内容）
@@ -238,6 +253,44 @@ fn render_output(output: &zed::process::Output) -> String {
     text
 }
 
+/// 最低要求：`bdl-lsp` 0.3.13（更旧的版本没有 0.3.2 起移出到 tiptop 的命令语义与
+/// `link.mode` 三态；本扩展的配置键按 0.3.13+ 的形状下发）。
+const MIN_BDL_LSP: (u32, u32, u32) = (0, 3, 13);
+/// 最低要求：`tiptop` 0.1.10（更旧的版本缺 `download`、`-region`、`-login-profile`）。
+const MIN_TIPTOP: (u32, u32, u32) = (0, 1, 10);
+
+/// 从 `version` 输出里解析版本号（`tiptop 0.1.10` / `bdl-lsp 0.3.14` / `0.1.10-rc1`）。
+fn parse_version(output: &str) -> Option<(u32, u32, u32)> {
+    let start = output.find(|c: char| c.is_ascii_digit())?;
+    let tail = &output[start..];
+    let mut numbers = Vec::new();
+    for part in tail.split(|c: char| !c.is_ascii_digit()).take(3) {
+        if part.is_empty() {
+            break;
+        }
+        numbers.push(part.parse::<u32>().ok()?);
+    }
+    match numbers.len() {
+        0 => None,
+        1 => Some((numbers[0], 0, 0)),
+        2 => Some((numbers[0], numbers[1], 0)),
+        _ => Some((numbers[0], numbers[1], numbers[2])),
+    }
+}
+
+/// 低于最低要求时返回一句提醒（无法解析版本就不提醒）。
+fn version_warning(name: &str, output: &str, min: (u32, u32, u32)) -> Option<String> {
+    let got = parse_version(output)?;
+    if got >= min {
+        return None;
+    }
+    Some(format!(
+        "{name} {}.{}.{} 低于最低要求 {}.{}.{}：更旧的版本缺 `download` / `-region` / `-login-profile` \n\
+         或 `link.mode` 三态等能力，建议升级（删掉旧二进制后扩展会自动下载最新版，或设置 ext.tools.path）。",
+        got.0, got.1, got.2, min.0, min.1, min.2
+    ))
+}
+
 fn exists(worktree: &zed::Worktree, relative: &str) -> String {
     match worktree.read_text_file(relative) {
         Ok(text) => format!("有（{relative}，{}）", human_bytes(text.len())),
@@ -266,5 +319,29 @@ fn human_bytes(bytes: usize) -> String {
         format!("{:.0} KB", bytes as f64 / KB as f64)
     } else {
         format!("{bytes} B")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_version_handles_real_outputs() {
+        assert_eq!(parse_version("tiptop 0.1.10"), Some((0, 1, 10)));
+        assert_eq!(parse_version("bdl-lsp 0.3.14"), Some((0, 3, 14)));
+        assert_eq!(parse_version("0.1.10-rc1"), Some((0, 1, 10)));
+        assert_eq!(parse_version("tiptop 1.2"), Some((1, 2, 0)));
+        assert_eq!(parse_version("无法执行：找不到文件"), None);
+    }
+
+    #[test]
+    fn version_warning_only_below_minimum() {
+        assert!(version_warning("tiptop", "tiptop 0.1.8", MIN_TIPTOP).is_some());
+        assert!(version_warning("tiptop", "tiptop 0.1.10", MIN_TIPTOP).is_none());
+        assert!(version_warning("bdl-lsp", "bdl-lsp 0.3.13", MIN_BDL_LSP).is_none());
+        assert!(version_warning("bdl-lsp", "bdl-lsp 0.3.9", MIN_BDL_LSP).is_some());
+        // 解析不出就不打扰用户
+        assert!(version_warning("bdl-lsp", "无法执行：没有这个文件", MIN_BDL_LSP).is_none());
     }
 }

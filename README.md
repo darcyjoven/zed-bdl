@@ -241,7 +241,7 @@ bash .zed/bdl/init-workspace.sh          # Windows: pwsh -File .zed\bdl\init-wor
 
 | 命令 | 参数 | 说明 |
 |---|---|---|
-| `/bdl-env-check` | — | 生效设置摘要、`bdl-lsp`/`tiptop` 版本与路径、资料状态 |
+| `/bdl-env-check` | — | 生效设置摘要、`bdl-lsp`/`tiptop` 版本与路径、资料状态；版本低于最低要求时提醒升级 |
 | `/bdl-link-status` | — | 链数 / orphan / ambiguous / 缺失文件 / 生成时间 / 局部更新 |
 | `/bdl-link-chain` | 程序代码 | 查该程序属于哪条链、链内有哪些文件（`模组/代码` 或带 `.4gl` 后缀都能写） |
 | `/bdl-schema-status` | — | 表数 / 列数 / 导入时间 / 来源 |
