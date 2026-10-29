@@ -67,6 +67,7 @@ Zed 命令面板 → zed: install dev extension → 选择本仓库目录
 | Windows x64 | `bdl-lsp-windows-amd64.zip` |
 
 - **本地已有二进制时不会下载**（用户装的优先；下载只作第 5 级兜底）。
+- 下载过一次后按版本分目录缓存：**常态启动直接复用缓存，不会去查 GitHub**（离线也能用）。
 - 状态显示在 Zed 的语言服务器状态里（检查更新 / 下载中 / 失败原因 + 可操作提示）。
 - 关闭：`lsp.bdl-lsp.settings.ext.download.bdlLsp = "off"`（键缺省即 `auto`）。
 - `tiptop` 的资产命名一致（`tiptop-linux-amd64.tar.gz` / `tiptop-darwin-arm64.tar.gz` / `tiptop-windows-amd64.zip`，附 `SHA256SUMS`；v0.1.10 起）。

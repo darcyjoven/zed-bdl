@@ -109,7 +109,8 @@ Zed 命令面板（cmd-shift-p / ctrl-shift-p）→ 输入 zed: install dev exte
 `tiptop` 同样有四个平台产物（`tiptop-<os>-<arch>.tar.gz|.zip`，含 `SHA256SUMS`）。
 
 - **本地已有二进制时永远优先**：只有「设置路径 → `BDL_LSP_PATH`/`TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/` → `PATH`」全部落空才会下载。
-- 缓存：扩展工作目录下按版本分目录（如 `bdl-lsp-0.3.14/`），同版本再次启动直接复用。
+- 缓存：扩展工作目录下按版本分目录（如 `bdl-lsp-0.3.14/`）。**只要缓存里有可用的二进制就直接复用最新一份，
+  不会每次都去查 GitHub**（离线也能启动）；只有缓存为空时才联网下载，下载完顺手清掉更旧的目录。
 - 关闭：`lsp.bdl-lsp.settings.ext.download.bdlLsp = "off"` / `ext.download.tiptop = "off"`（键缺省即 `auto`）。
 - capability：需要 `download_file`（`extension.toml` 已声明 `host=github.com`、`path=["darcyjoven","**"]`）；
   若你在 `granted_extension_capabilities` 里收紧了权限，要放行同样形状，否则会提示 capability 错误。

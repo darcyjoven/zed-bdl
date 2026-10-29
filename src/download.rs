@@ -83,6 +83,13 @@ fn ensure(
         ));
     };
 
+    // 先看本地缓存：按版本分目录下载过就直接用**最新**的一份。
+    // 这样常态启动不需要联网，也不会每次都被 GitHub 的可用性拖住
+    // （离线时更不会因为查询失败而报"找不到二进制"）。
+    if let Some(cached) = cached_binary(prefix, os) {
+        return Ok(cached);
+    }
+
     report(server_id, zed::LanguageServerInstallationStatus::CheckingForUpdate);
 
     let release = zed::latest_github_release(
@@ -148,6 +155,38 @@ fn ensure(
     Ok(binary)
 }
 
+/// 在扩展目录里找已下载的缓存二进制：只认 `<prefix>-<版本>/<二进制>` 这种目录，
+/// 多个版本时取**版本号最大**的一个（数值比较，不是字符串比较）。
+fn cached_binary(prefix: &str, os: zed::Os) -> Option<String> {
+    cached_binary_in(Path::new("."), prefix, os)
+}
+
+/// `cached_binary` 的可测版本：在指定目录里找缓存（测试用临时目录）。
+fn cached_binary_in(dir: &Path, prefix: &str, os: zed::Os) -> Option<String> {
+    let binary = binary_file_name(prefix, os);
+    let entries = std::fs::read_dir(dir).ok()?;
+    let mut best: Option<((u32, u32, u32), String)> = None;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(version) = name
+            .strip_prefix(&format!("{prefix}-"))
+            .and_then(crate::version::parse)
+        else {
+            continue;
+        };
+        // 存在性检查要落到 dir 下；返回值仍是**相对路径**（Zed 的扩展工作目录）。
+        let candidate = format!("{name}/{binary}");
+        if !dir.join(&candidate).is_file() {
+            continue;
+        }
+        if best.as_ref().map(|(v, _)| version > *v).unwrap_or(true) {
+            best = Some((version, candidate));
+        }
+    }
+    best.map(|(_, path)| path)
+}
+
 /// 是否在设置里关掉了自动下载。
 fn download_disabled(settings: &Settings, prefix: &str) -> bool {
     let key = if prefix == LSP_ASSET { "bdlLsp" } else { "tiptop" };
@@ -209,6 +248,24 @@ mod tests {
             Some("tiptop-windows-amd64.zip")
         );
         assert_eq!(asset_name_for(LSP_ASSET, Linux, X86), None);
+    }
+
+    #[test]
+    fn cached_binary_picks_newest_version() {
+        let base = std::env::temp_dir().join(format!("zed-bdl-cache-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        for version in ["0.3.9", "0.3.14"] {
+            let dir = base.join(format!("bdl-lsp-{version}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("bdl-lsp"), b"x").unwrap();
+        }
+        // 干扰项：不是二进制目录、以及缺二进制的目录
+        std::fs::create_dir_all(base.join("tiptop-0.1.10")).unwrap();
+        std::fs::create_dir_all(base.join("bdl-lsp-9.9.9")).unwrap();
+
+        let got = cached_binary_in(&base, "bdl-lsp", zed::Os::Linux);
+        assert_eq!(got.as_deref(), Some("bdl-lsp-0.3.14/bdl-lsp"));
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

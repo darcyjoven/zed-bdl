@@ -259,28 +259,9 @@ const MIN_BDL_LSP: (u32, u32, u32) = (0, 3, 13);
 /// 最低要求：`tiptop` 0.1.10（更旧的版本缺 `download`、`-region`、`-login-profile`）。
 const MIN_TIPTOP: (u32, u32, u32) = (0, 1, 10);
 
-/// 从 `version` 输出里解析版本号（`tiptop 0.1.10` / `bdl-lsp 0.3.14` / `0.1.10-rc1`）。
-fn parse_version(output: &str) -> Option<(u32, u32, u32)> {
-    let start = output.find(|c: char| c.is_ascii_digit())?;
-    let tail = &output[start..];
-    let mut numbers = Vec::new();
-    for part in tail.split(|c: char| !c.is_ascii_digit()).take(3) {
-        if part.is_empty() {
-            break;
-        }
-        numbers.push(part.parse::<u32>().ok()?);
-    }
-    match numbers.len() {
-        0 => None,
-        1 => Some((numbers[0], 0, 0)),
-        2 => Some((numbers[0], numbers[1], 0)),
-        _ => Some((numbers[0], numbers[1], numbers[2])),
-    }
-}
-
 /// 低于最低要求时返回一句提醒（无法解析版本就不提醒）。
 fn version_warning(name: &str, output: &str, min: (u32, u32, u32)) -> Option<String> {
-    let got = parse_version(output)?;
+    let got = crate::version::parse(output)?;
     if got >= min {
         return None;
     }
@@ -325,15 +306,6 @@ fn human_bytes(bytes: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parse_version_handles_real_outputs() {
-        assert_eq!(parse_version("tiptop 0.1.10"), Some((0, 1, 10)));
-        assert_eq!(parse_version("bdl-lsp 0.3.14"), Some((0, 3, 14)));
-        assert_eq!(parse_version("0.1.10-rc1"), Some((0, 1, 10)));
-        assert_eq!(parse_version("tiptop 1.2"), Some((1, 2, 0)));
-        assert_eq!(parse_version("无法执行：找不到文件"), None);
-    }
 
     #[test]
     fn version_warning_only_below_minimum() {

@@ -393,9 +393,11 @@ cargo build --release --target wasm32-wasip2
 > `ext.download.bdlLsp=off` 可关；`set_language_server_installation_status` 三态上报；
 > 资产名已对 `api.github.com` 实测（`bdl-lsp-linux-amd64.tar.gz` 等 4 个 + SHA256SUMS 均存在），
 > 新增 2 个单测）。**Z-P4-2 也已可用**：tiptop v0.1.10 Release 已发布，同一套 `ensure_tools` 代码路径生效。
-> **Z-P4-3 已落地**（三态安装状态上报）；**Z-P4-4 已落地**：`/bdl-env-check` 会解析
+> **Z-P4-3 已落地**（三态安装状态上报）；**缓存优先**：本地已有 `<prefix>-<版本>/` 缓存时直接复用最新一份，
+> **不再每次启动都查 GitHub**（离线也能起，`cached_binary` 有单测：数值比版本、忽略缺二进制的目录）；
+> **Z-P4-4 已落地**：`/bdl-env-check` 会解析
 > `bdl-lsp`/`tiptop` 的 `version` 输出，低于最低要求（0.3.13 / 0.1.10）时给一句升级提醒（不硬拦），
-> 新增 2 个单测（`parse_version` / `version_warning`）。
+> 新增 3 个单测（`version::parse` / `version_warning` / `cached_binary`）。
 > 待实机：§11.2 #16。
 
 | # | 任务 | 落点 | 验收 | 依赖 |
@@ -551,7 +553,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > Z-P3-5 ✅（bdl-lsp/tiptop 文档已同步）；**Z-P3-1 / Z-P3-3 / Z-P3-6 待确认或待实机** ·
 > 第五轮 ✅（`90ae4d8`/`0c0cdf9`）· 第六轮待实机验收（由用户执行 §11.2 清单）。
 >
-> 护栏现状：清单 **17** 项 · init-script **14** 项 · query **47** 项 · `cargo test` **12** 项 · wasm 310 KB。
+> 护栏现状：清单 **17** 项 · init-script **14** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 314 KB。
 
 ```text
 【第一轮 · 只改本仓库，零外部依赖】

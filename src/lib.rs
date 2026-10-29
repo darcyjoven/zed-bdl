@@ -21,6 +21,7 @@ mod config;
 mod download;
 mod project;
 mod slash;
+mod version;
 
 use zed_extension_api as zed;
 
