@@ -6,7 +6,7 @@
 |---|---|
 | 扩展 id | **`4gl-full`**（仓库 `zed-bdl`；可与只有 grammar 的轻量扩展 `bdl` 共存） |
 | 本手册对应版本 | 扩展 **`0.2.0`**（阶段见 [PLAN §7](PLAN.md)） |
-| 语言服务器 | `bdl-lsp` **v0.3.15**（Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`）；**函数级反查 Code Lens 需要 v0.3.16**（源码已就绪，Release 待发） |
+| 语言服务器 | `bdl-lsp` **v0.3.16**（Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`）；含 Code Lens / `executeCommand` / 项目符号 / **函数级反查** |
 | 采集 / 部署 CLI | `tiptop` **v0.1.10**（四平台 GitHub Release + `SHA256SUMS`；2026-10-29 首次发布） |
 | 参照物 | VSCode 插件 `4gl-full` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏树视图） |
 | v1 承诺平台 | **Linux + Windows**（macOS 后续补齐） |
@@ -137,8 +137,8 @@ cd tiptop;  powershell -File scripts\build.ps1
 > 0.1.8 的 `tiptop` **缺 `download`、`-region`、`-login-profile`**，表现为「未知子命令 / 参数不认识」。
 
 ```bash
-bdl-lsp version      # 期望 0.3.15（≥0.3.13 都可用；0.3.15 起有 executeCommand / Code Lens / 项目符号）
-                      # 0.3.16 起还有函数级反查 Code Lens（见 §3.3）
+bdl-lsp version      # 期望 0.3.16（≥0.3.13 都可用；0.3.15 起有 executeCommand / Code Lens / 项目符号，
+                      # 0.3.16 起还有函数级反查 Code Lens，见 §3.3）
 tiptop  version      # 期望 0.1.10
 ```
 
@@ -418,7 +418,7 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 > `workspace/executeCommand`（命令 `bdl.openLink`），服务端再反向发 `window/showDocument`，
 > Zed **支持**这个反向请求并会**真的打开目标文件**。所以点击 lens 打开链内文件是预期行为。
 > 即使点击没反应，也可从 **`lsp command selector`** 手动触发同一条命令（兜底），或者用下面的 `/bdl-link-chain` 文本视图。
-> 前置已满足：**`bdl-lsp v0.3.15` 已发布**（2026-10-29），自动下载与手工安装都能拿到 Code Lens / `executeCommand` / 项目符号。
+> 前置已满足：**`bdl-lsp v0.3.16` 已发布**（2026-10-29），自动下载与手工安装都能拿到 Code Lens / `executeCommand` / 项目符号 / 函数级反查。
 
 > ⚠️ **一条容易踩的坑（已修）**：Zed 只显示 lens **自带的标题**（`command.title`）。如果一条 lens
 > 没有可点击的命令，Zed 会显示成一个**假的**「0 references」。所以本扩展的所有"说明性"一行

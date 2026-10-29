@@ -13,7 +13,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 > - v1 验证平台：**Linux + Windows**（macOS 后续补齐）。
 
 **版本**：扩展 `0.1.1` → 目标 `0.2.0`（追平中，阶段见 [PLAN §7](docs/PLAN.md)）。
-后端：`bdl-lsp` **v0.3.15**（四平台 Release；含 executeCommand / Code Lens / workspaceSymbolProvider；**函数级反查需 v0.3.16**，源码已就绪、Release 待发）· `tiptop` **v0.1.10**（四平台 Release）。
+后端：`bdl-lsp` **v0.3.16**（四平台 Release；含 executeCommand / Code Lens / workspaceSymbolProvider / 函数级反查）· `tiptop` **v0.1.10**（四平台 Release）。
 
 ---
 

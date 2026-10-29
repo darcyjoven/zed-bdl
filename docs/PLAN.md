@@ -2,7 +2,7 @@
 
 > **盘点日期**：2026-10-28（本次为**全量重写**，旧 PLAN 已删除）
 > **参照物**：VSCode 插件 `vscode-bdl` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏视图）
-> **后端基线**：`bdl-lsp` **v0.3.16**（源码；最新四平台 Release 是 **v0.3.15**，0.3.16 待打 tag）· `tiptop` **v0.1.10**（四平台 Release，2026-10-29）
+> **后端基线**：`bdl-lsp` **v0.3.16**（四平台 Release，2026-10-29）· `tiptop` **v0.1.10**（四平台 Release，2026-10-29）
 > **本仓库基线**：`zed-bdl` **0.1.1**（目标 0.2.0 起分阶段推进）
 > **目的**：以 VSCode 侧**当前**已有进度为基准，把 Zed 侧推进到同等能力；平台做不到的部分**逐条给出已确认的降级方案**，不留"两边不一样"的模糊状态。
 >
@@ -48,7 +48,7 @@
 | 组件 | 版本 / 状态 | 证据 |
 |---|---|---|
 | `vscode-bdl`（4gl-full） | **0.9.2**，`bin/` 内置 `bdl-lsp` + `tiptop`，33 命令 / 50 设置键 / 2 视图 / 55 条 menus / 27 activationEvents / 0 keybindings | `vscode-extension/package.json:2,5,60,531-1019` |
-| `bdl-lsp` | 源码 **0.3.16**（`9ca180a`：函数级反查 Code Lens + `bdl.showInfo`）；最新 tag `v0.3.15`（2026-10-29 发布，含 executeCommand / Code Lens / workspaceSymbolProvider），`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS` | `bdl-lsp/main.go:35`、`release.yml` |
+| `bdl-lsp` | **0.3.16**，tag `v0.3.16`（2026-10-29 发布：executeCommand / Code Lens / workspaceSymbolProvider + **函数级反查** + `bdl.showInfo`），`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS`；**Release 产物已实测**：SHA256 校验通过、`bdl-lsp version` = 0.3.16、握手实测 `codeLensProvider` / `workspaceSymbolProvider: true` / 7 条 executeCommand（含 `bdl.showInfo`）都在 | `bdl-lsp/main.go:35`、`release.yml` |
 | `tiptop` | **v0.1.10**（2026-10-29 首次发布）；新增 `release.yml`：tag `v*` → 四平台产物 + `SHA256SUMS` | `tiptop/main.go:40`、`.github/workflows/release.yml` |
 | `zed-bdl`（本仓库） | **0.2.0**（P0 已落地）；`src/` 拆为 `lib.rs` + `config.rs` + `binary.rs`；10 个 `.scm`；**17 项**清单校验 + 47 项 query 校验 + 3 个单元测试 | `extension.toml:4`、`Cargo.toml:3`、`tests/` |
 | 本地已构建二进制 | `bdl-lsp 0.3.13`、`tiptop 0.1.8` —— **都过期**，`tiptop` 旧二进制缺 `download` / `-region` / `-login-profile` | 实跑 `artifacts/bin/* version` |
@@ -69,7 +69,7 @@
 | 旧结论 | 实测更正 |
 |---|---|
 | 「Zed 侧原样透传用户设置，服务端兜底 true」 | **更严重**：`lsp.bdl-lsp.settings` 根本不会到达 `bdl-lsp`（服务端从不发 `workspace/configuration`）。自定义键、`link.mode`、`diagnostics` 在 Zed 上今天**全部无效**。→ Z-P0-3 / Z-P3-1 |
-| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已完全满足**：`bdl-lsp`（**v0.3.15**，源码已到 0.3.16）与 `tiptop`（v0.1.10）都有四平台 Release + `SHA256SUMS`。→ Z-P4-1 / Z-P4-2 均已落地 |
+| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已完全满足**：`bdl-lsp`（**v0.3.16**）与 `tiptop`（v0.1.10）都有四平台 Release + `SHA256SUMS`。→ Z-P4-1 / Z-P4-2 均已落地 |
 | 「跨仓库文档 `bdl-lsp/docs/PENDING.md` 是待办唯一清单」 | 该文件**已不存在**（现只有 `DIAGNOSTICS.md` + `FEATURES.md`）；VSCode 侧唯一待办是 `vscode-bdl/docs/TODO.md`，Zed 侧唯一待办是**本文件**。 |
 
 > 另需注意：`vscode-bdl/docs/FEATURES.md` 头部仍写 0.6.2、`COMMANDS.md` 里的命令数与设置键数互相矛盾、文档写了 `bdl/linkReferences` 但源码从未发送该请求。**追平时一律以源码/`package.json` 为准，不要抄 VSCode 侧文档的数字。**
@@ -533,7 +533,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | 13 | Code Lens ③ | 链内文件数 > `link.lensMax`（默认 10）时只显示前 N 条 + 一条**汇总**（标题「…另有 N 个链内文件」，**点了会弹提示**说明还剩多少 —— 这是 `bdl.showInfo` 命令；不再是"点了没反应"的纯文本）；把 `link.lensMax` 调小可复现 | P3（已实现） |
 | 14 | **函数级反查** | ✅ **已实现**（`bdl-lsp` 0.3.16）：函数定义那行出现「🔗 函数名 被 N 处调用（点开首处 …）」，点它跳到**第一处调用**。口径与「查找引用」一致（只算可达模组：本模组 + 全局模组）。要看全部调用点用 Zed 原生「查找引用」。**依赖工作区索引**，索引没建好时不显示（属正常，不是故障） | P3（已实现，待实机） |
 | 15 | 设置热更新 | 改 `settings`（例如 `diagnostics` 级别）后**无需重启**即生效；`zed: open log` 里应出现 bdl-lsp 的 `配置已更新` | P3（已由源码解释，实机顺手确认） |
-| 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功（应拿到 **bdl-lsp v0.3.16** / tiptop v0.1.10）；**删掉扩展目录里的 `bdl-lsp-*` 缓存目录**再打开 `.4gl` 应重下；离线时应复用缓存而不是报错；失败有可操作提示 | P4（已实现） |
+| 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功（应拿到 **bdl-lsp v0.3.16** / tiptop v0.1.10；**Release 已实测**：SHA256 校验通过、`version` = 0.3.16、握手 7 条命令含 `bdl.showInfo`）；**删掉扩展目录里的 `bdl-lsp-*` 缓存目录**再打开 `.4gl` 应重下；离线时应复用缓存而不是报错；失败有可操作提示 | P4（已实现） |
 | 17 | 路径含空格与中文 | 诊断/跳转/下载/上传均正常（Windows 尤其） | P1/P4 |
 | 18 | ABI 15 ↔ Zed tree-sitter 运行时 | 高亮/outline 正常（若异常，是 grammar 兼容问题，需换 rev） | P0 |
 | 19 | **项目符号搜索** | `project symbols: toggle` 能搜到 BDL 函数（`bdl-lsp ≥ 0.3.15` 已声明 `workspaceSymbolProvider`；0.3.15 之前预期搜不到） | P3（Z-P3-6 已修，待实机） |
@@ -576,7 +576,8 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > **Z-P3-1 ❌ 不采纳**（证据推翻：Zed 用 `didChangeConfiguration` 推设置，热更新本来就有）、
 > 文档热更新口径全面更正（"改完必须重启" → "通常不用重启"）。
 >
-> **第八轮（2026-10-29 晚）**：**函数级反查 Code Lens 已实现**（`bdl-lsp@9ca180a`，源码 0.3.16，已推 origin/main）：
+> **第八轮（2026-10-29 晚）**：**`bdl-lsp` tag v0.3.16 已发布**（四平台 + `SHA256SUMS`，Release 产物实测可用）。
+> **函数级反查 Code Lens 已实现**（`bdl-lsp@9ca180a`，已推 origin/main）：
 > 函数定义那行挂「🔗 函数名 被 N 处调用」，点它跳到第一处调用；口径与「查找引用」一致
 > （只算可达模组）。同时**修掉一个只有 Zed 才会暴露的坑**：Zed 只显示 `lens.command.title`，
 > 没有 command 的 lens 会回落到**假的**「0 references」→ 新增命令 `bdl.showInfo`，
