@@ -147,9 +147,11 @@ cd tiptop;  powershell -File scripts\build.ps1
 
 - `link.mode` / `schema.mode` 三态 `off | file | db`，**默认 `off`（轻量档：不连库、不写工作区）**；导入 CSV 后设 `file`，直连 Oracle 设 `db`。
 - `diagnostics` 是逐诊断码调级的**唯一入口**（`off | error | warning | information | hint`）。
-- `ext.build.*.command` 里的占位符与 VSCode 一致，分隔符恒为 `/`：`${path}`（两层，如 `axc/4gl`）、`${fullpath}`（三层）、`${name}`（去扩展名）、`${fullname}`（含扩展名）。
-  ⚠️ **Zed 侧这些键目前只是记录**：task 读不到 Zed 设置，生成脚本用内置默认模板，
-  真正生效的是 **`.zed/tasks.json` 里各 task 的 `-command`**（plan Z-P2-4 会让生成脚本读它们）。
+- `ext.build.*` 里的占位符与 VSCode 一致，分隔符恒为 `/`：`${path}`（两层，如 `axc/4gl`）、`${fullpath}`（三层）、`${name}`（去扩展名）、`${fullname}`（含扩展名）。
+  ✅ **改完重跑一次生成脚本就生效**：`scripts/zed/init-workspace.*` 会回读
+  `lsp.bdl-lsp.settings.ext.build.<lang>.<mode>`，把占位符映射成 Zed 变量
+  （`${path}`/`${fullpath}` → `$ZED_RELATIVE_DIR`、`${name}` → `$ZED_STEM`、`${fullname}` → `$ZED_FILENAME`）
+  写进 `.zed/tasks.json`；没配的条目保持内置默认。也可以直接改 task 里的 `-command`。
 - ✅ **上传/下载/部署需要的 `.project/deploy/deploy.json` 由生成脚本产出**（问答里填了生产主机 + 生产根、
   上传方式不是 `off` 时；已存在则写 `deploy.json.bdl-new` 不覆盖）。不用脚本时可手写
   （样例见 [USER-GUIDE §5.4](docs/USER-GUIDE.md)）；`settings.ext.prod.deploy.*` 本身只是记录（PLAN Z-P2-4）。
@@ -324,7 +326,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字覆盖 / 真实语料编译）
 cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py     # 初始化脚本产物 13 项（task 齐全 / 无 ${…} / deploy.json / 迁移 helper / 不写密码）
+python3 tests/verify-init-script.py     # 初始化脚本产物 14 项（task 齐全 / 无 ${…} / deploy.json / 迁移 helper / ext.build 覆盖）
 cargo build --release --target wasm32-wasip2
 ```
 

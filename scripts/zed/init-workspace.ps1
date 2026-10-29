@@ -449,7 +449,7 @@ $tasksTmpl = @'
   {
     "label": "4gl: 4GL 预演编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_4GL_PREVIEW@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -458,7 +458,7 @@ $tasksTmpl = @'
   {
     "label": "4gl: 4GL 编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_4GL_COMPILE@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -467,7 +467,7 @@ $tasksTmpl = @'
   {
     "label": "4gl: 4GL 链接",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "r.l2 $ZED_STEM", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_4GL_LINK@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -476,7 +476,7 @@ $tasksTmpl = @'
   {
     "label": "4gl: Form 预演编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && rm $ZED_STEM.42f", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_PER_PREVIEW@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -485,7 +485,7 @@ $tasksTmpl = @'
   {
     "label": "4gl: Form 编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && mv $ZED_STEM.42f ../42f/ && gsform -M -W all -i -import $ZED_FILENAME && mv $ZED_STEM.4fd ../4fd/", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_PER_COMPILE@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -494,7 +494,7 @@ $tasksTmpl = @'
   {
     "label": "4gl: Form 预览画面",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && r.gf $ZED_STEM 2 p", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_PER_FORM@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -697,6 +697,31 @@ $eRemoteRoot = ConvertTo-JsonText $remoteRoot
 $eLocalRoot = ConvertTo-JsonText $localRoot
 $eInitScript = ConvertTo-JsonText $initScript
 
+# ext.build.* 模板：回读已有的 .zed/settings.json（Z-P2-4 ②）
+# task 读不到 Zed 设置，"改模板"要重跑本脚本；读不到/没配 → 内置默认模板。
+function Get-BuildTemplate([string]$Lang, [string]$Mode) {
+    if (-not (Test-Path -LiteralPath $settingsJson -PathType Leaf)) { return '' }
+    try {
+        $data = Get-Content -LiteralPath $settingsJson -Raw -Encoding UTF8 | ConvertFrom-Json
+    } catch {
+        return ''
+    }
+    $node = $data
+    foreach ($key in @('lsp', 'bdl-lsp', 'settings', 'ext', 'build', $Lang, $Mode)) {
+        if ($null -eq $node) { return '' }
+        $prop = $node.PSObject.Properties[$key]
+        if (-not $prop) { return '' }
+        $node = $prop.Value
+    }
+    if ($node -is [string] -and $node.Trim()) { return $node.Trim() }
+    return ''
+}
+
+# tiptop 模板占位符 → Zed task 变量（单引号里 $ 是字面量，不会被 PS 插值）
+function ConvertFrom-TiptopTemplate([string]$Template) {
+    return $Template.Replace('${fullpath}', '$ZED_RELATIVE_DIR').Replace('${path}', '$ZED_RELATIVE_DIR').Replace('${fullname}', '$ZED_FILENAME').Replace('${name}', '$ZED_STEM')
+}
+
 # settings 若已存在就不覆盖，改写到 .bdl-new
 $settingsRel = '.zed/settings.json'
 if (Test-Path -LiteralPath $settingsJson -PathType Leaf) {
@@ -719,6 +744,33 @@ $settingsOut = Fill-Template $settingsTmpl @{
     '@@REMOTE_ROOT@@' = $eRemoteRoot
 }
 
+$cmd4glPreview = 'cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM'
+$cmd4glCompile = 'cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM'
+$cmd4glLink = 'r.l2 $ZED_STEM'
+$cmdPerPreview = 'cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && rm $ZED_STEM.42f'
+$cmdPerCompile = 'cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && mv $ZED_STEM.42f ../42f/ && gsform -M -W all -i -import $ZED_FILENAME && mv $ZED_STEM.4fd ../4fd/'
+$cmdPerForm = 'cd $ZED_RELATIVE_DIR && r.gf $ZED_STEM 2 p'
+$buildOverrides = 0
+foreach ($pair in @(
+        @{ Lang = '4gl'; Mode = 'preview'; Var = 'cmd4glPreview' },
+        @{ Lang = '4gl'; Mode = 'compile'; Var = 'cmd4glCompile' },
+        @{ Lang = '4gl'; Mode = 'link'; Var = 'cmd4glLink' },
+        @{ Lang = 'per'; Mode = 'preview'; Var = 'cmdPerPreview' },
+        @{ Lang = 'per'; Mode = 'compile'; Var = 'cmdPerCompile' },
+        @{ Lang = 'per'; Mode = 'form'; Var = 'cmdPerForm' }
+    )) {
+    $custom = Get-BuildTemplate $pair.Lang $pair.Mode
+    if (-not [string]::IsNullOrEmpty($custom)) {
+        $mapped = ConvertFrom-TiptopTemplate $custom
+        Set-Variable -Name $pair.Var -Value $mapped
+        $buildOverrides++
+        Write-Info ('ext.build.' + $pair.Lang + '.' + $pair.Mode + ' 覆盖了默认模板：' + $mapped)
+    }
+}
+if ($buildOverrides -eq 0) {
+    Write-Info 'ext.build.* 未配置：exec task 用内置默认模板'
+}
+
 $tasksOut = Fill-Template $tasksTmpl @{
     '@@TIPTOP@@'      = $eTiptopCmd
     '@@ORA_HOST@@'    = $eOraHost
@@ -726,6 +778,12 @@ $tasksOut = Fill-Template $tasksTmpl @{
     '@@ORA_SERVICE@@' = $eOraService
     '@@ORA_USER@@'    = $eOraUser
     '@@EXEC_FLAGS@@'  = $execFlags
+    '@@CMD_4GL_PREVIEW@@' = $cmd4glPreview
+    '@@CMD_4GL_COMPILE@@' = $cmd4glCompile
+    '@@CMD_4GL_LINK@@'    = $cmd4glLink
+    '@@CMD_PER_PREVIEW@@' = $cmdPerPreview
+    '@@CMD_PER_COMPILE@@' = $cmdPerCompile
+    '@@CMD_PER_FORM@@'    = $cmdPerForm
     '@@INIT_TAIL@@'   = $initTail
 }
 

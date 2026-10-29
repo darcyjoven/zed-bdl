@@ -625,9 +625,11 @@ tiptop exec -command 'cd aap/4gl && r.c2 x' -dry-run                  # 只打�
 
 模板占位符（模板可改，分隔符**恒为 `/`**）：`${path}`（两层，如 `aap/4gl`）、`${fullpath}`（三层）、`${name}`（去扩展名）、`${fullname}`（含扩展名）。默认模板（`ext.build.*`）：
 
-> ⚠️ **Zed 侧 `ext.build.*` 目前不生效**：task 读不到 Zed 设置，生成脚本用的是内置默认模板；
-> 也就是说 Zed 上"有效的模板"是 **`.zed/tasks.json` 里各 task 的 `-command`**（改那里即可生效）。
-> `ext.build.*` 暂时只是配置记录（PLAN Z-P2-4 会让生成脚本读它）。
+> ✅ **Zed 侧 `ext.build.*` 已生效（0.2.0，Z-P2-4 ②）**：生成脚本会回读
+> `lsp.bdl-lsp.settings.ext.build.<lang>.<mode>`，把 tiptop 占位符映射成 Zed 变量
+> （`${path}`/`${fullpath}` → `$ZED_RELATIVE_DIR`、`${name}` → `$ZED_STEM`、`${fullname}` → `$ZED_FILENAME`）
+> 后写进 `.zed/tasks.json`；**改完模板要重跑一次生成脚本**（或直接改 task 的 `-command`）。
+> 没配的条目用下面的内置默认值。
 
 ```text
 4gl.preview   cd ${path} && r.c2 ${name}
@@ -903,8 +905,8 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | `ext.prod.deploy.host` / `port` / `user` / `region` / `strictHostKey` | string/int/bool | `22` / `"1"` / `true`，其余空 | SSH 主机/端口/账号（**只支持密钥**）；登录后要输入的区（`1` topprod / `2` toptest / `3` topstd / `4` Browser-based）；严格主机密钥校验 |
 | `ext.prod.deploy.transport` / `localRoot` / `remoteRoot` | string | `"off"` / `"."` / `""` | 上传方式（`off \| rsync \| scp`，`off` = 关闭上传）、本地根、生产根 |
 | `ext.deploy.enable` / `ext.build.enable` | bool | `false` | 仅作配置记录（**扩展与 task 都不读**，Zed 也没有按钮显隐）；是否跑 task 由你自己决定 |
-| `ext.build.4gl.preview` / `compile` / `link` | string | 见 §5.3 默认模板 | 4GL 三条命令模板 |
-| `ext.build.per.preview` / `compile` / `form` | string | 见 §5.3 默认模板 | Form 三条命令模板 |
+| `ext.build.4gl.preview` / `compile` / `link` | string | 见 §5.3 默认模板 | 4GL 三条命令模板；**改完重跑生成脚本即写进 task**（Z-P2-4 ②） |
+| `ext.build.per.preview` / `compile` / `form` | string | 见 §5.3 默认模板 | Form 三条命令模板；同上 |
 | `ext.download.bdlLsp` / `ext.download.tiptop` | string | `"auto"` | 自动下载开关 `auto \| off`（键缺省 = `auto`）。两者都已可用（`tiptop` v0.1.10 起有 Release）。**只在四级本地查找全落空时才下载** |
 
 **③ Zed 宿主键**（不是本扩展的 `settings`，由 Zed 直接消费）：

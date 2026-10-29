@@ -285,6 +285,61 @@ def main() -> int:
             else:
                 ok("迁移 helper：旧目录搬入 .project/、空目录删除、已存在的目标文件未被覆盖")
 
+    # 场景四：ext.build.* 覆盖 → 生成脚本应回读并映射成 Zed 变量（PLAN Z-P2-4 ②）
+    with tempfile.TemporaryDirectory(prefix="bdl-init-build-") as tmp:
+        root = Path(tmp)
+        (root / ".zed").mkdir(parents=True)
+        (root / ".zed/settings.json").write_text(
+            json.dumps(
+                {
+                    "lsp": {
+                        "bdl-lsp": {
+                            "settings": {
+                                "ext": {
+                                    "build": {
+                                        "4gl": {
+                                            "compile": "cd ${path} && mycc -M ${name}",
+                                            "link": "mylink ${fullname}",
+                                        },
+                                        "per": {"form": "cd ${fullpath} && myform ${name} 2 p"},
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        run_generator(root, "bash")
+        try:
+            tasks = json.loads((root / ".zed/tasks.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            fail(f"[bash] ext.build 场景：tasks.json 不合法：{exc}")
+            tasks = []
+        by_label = {t.get("label"): t.get("args", []) for t in tasks}
+        expect = {
+            "4gl: 4GL 编译": "cd $ZED_RELATIVE_DIR && mycc -M $ZED_STEM",
+            "4gl: 4GL 链接": "mylink $ZED_FILENAME",
+            "4gl: Form 预览画面": "cd $ZED_RELATIVE_DIR && myform $ZED_STEM 2 p",
+            # 没配的那条必须保持内置默认
+            "4gl: 4GL 预演编译": "cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM",
+        }
+        problems = []
+        for label, want in expect.items():
+            args = by_label.get(label, [])
+            got = args[2] if len(args) > 2 else None
+            if got != want:
+                problems.append(f"{label}: {got!r} != {want!r}")
+        leftover = [a for args in by_label.values() for a in args if isinstance(a, str) and "${" in a]
+        if problems:
+            fail(f"[bash] ext.build 覆盖未生效：{problems}")
+        elif leftover:
+            fail(f"[bash] ext.build 场景仍残留 ${{…}}：{leftover}")
+        else:
+            ok("[bash] ext.build.* 覆盖生效（映射成 Zed 变量，未配置的保持默认）")
+
     if PS1.is_file() and shutil.which("pwsh"):
         with tempfile.TemporaryDirectory(prefix="bdl-init-ps-") as tmp:
             root = Path(tmp)

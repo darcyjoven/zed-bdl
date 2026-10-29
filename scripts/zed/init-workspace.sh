@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
+# 本脚本大量用单引号保存**要给 Zed 展开**的 $ZED_* 字面量（以及写给 tiptop 的
+# ${path}/${name} 映射），SC2016 在这里是误报（见 docs/PLAN.md R12）。
 # =============================================================================
 # 4gl-full / zed-bdl —— Zed 工程初始化脚本（交互式，Linux / macOS / WSL）
 #
@@ -461,7 +464,7 @@ TASKS_TMPL=$(cat <<'JSON'
   {
     "label": "4gl: 4GL 预演编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_4GL_PREVIEW@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -470,7 +473,7 @@ TASKS_TMPL=$(cat <<'JSON'
   {
     "label": "4gl: 4GL 编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_4GL_COMPILE@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -479,7 +482,7 @@ TASKS_TMPL=$(cat <<'JSON'
   {
     "label": "4gl: 4GL 链接",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "r.l2 $ZED_STEM", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_4GL_LINK@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -488,7 +491,7 @@ TASKS_TMPL=$(cat <<'JSON'
   {
     "label": "4gl: Form 预演编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && rm $ZED_STEM.42f", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_PER_PREVIEW@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -497,7 +500,7 @@ TASKS_TMPL=$(cat <<'JSON'
   {
     "label": "4gl: Form 编译",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && mv $ZED_STEM.42f ../42f/ && gsform -M -W all -i -import $ZED_FILENAME && mv $ZED_STEM.4fd ../4fd/", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_PER_COMPILE@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -506,7 +509,7 @@ TASKS_TMPL=$(cat <<'JSON'
   {
     "label": "4gl: Form 预览画面",
     "command": "@@TIPTOP@@",
-    "args": ["exec", "-command", "cd $ZED_RELATIVE_DIR && r.gf $ZED_STEM 2 p", @@EXEC_FLAGS@@],
+    "args": ["exec", "-command", "@@CMD_PER_FORM@@", @@EXEC_FLAGS@@],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true,
@@ -603,6 +606,82 @@ else
 fi
 E_TIPTOP_CMD=$(json_escape "$TIPTOP_CMD")
 
+# ---------------------------------------------------------------------------
+# ext.build.* 模板：回读用户已有的 .zed/settings.json（Z-P2-4 ②）
+#
+# task 读不到 Zed 设置，"改模板"只能靠重跑本脚本：这里把 ext.build.<lang>.<mode>
+# 读出来，再把 tiptop 侧的 ${path}/${fullpath}/${name}/${fullname} 映射成 Zed 变量
+# （$ZED_RELATIVE_DIR / $ZED_STEM / $ZED_FILENAME）写进 task。
+# 读不到或没配 → 用内置默认模板（与之前行为一致）。
+# ---------------------------------------------------------------------------
+
+HAVE_PY=0
+if command -v python3 >/dev/null 2>&1; then
+    HAVE_PY=1
+fi
+
+# 读 ext.build.<lang>.<mode>；没有/读不出就输出空串（走默认模板）。
+read_build_tmpl() { # <lang> <mode>
+    [ "$HAVE_PY" = "1" ] || return 0
+    python3 - "$SETTINGS_JSON" "$1" "$2" <<'PYEOF' 2>/dev/null || true
+import json
+import sys
+
+path, lang, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+except Exception:
+    raise SystemExit(0)
+node = data
+for key in ("lsp", "bdl-lsp", "settings", "ext", "build", lang, mode):
+    if not isinstance(node, dict) or key not in node:
+        raise SystemExit(0)
+    node = node[key]
+if isinstance(node, str) and node.strip():
+    print(node.strip())
+PYEOF
+}
+
+# tiptop 模板占位符 → Zed task 变量（四种互不为子串）
+map_tiptop_template() {
+    printf '%s' "$1" |
+        sed -e 's/\${fullpath}/$ZED_RELATIVE_DIR/g' \
+            -e 's/\${path}/$ZED_RELATIVE_DIR/g' \
+            -e 's/\${fullname}/$ZED_FILENAME/g' \
+            -e 's/\${name}/$ZED_STEM/g'
+}
+
+CMD_4GL_PREVIEW='cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM'
+CMD_4GL_COMPILE='cd $ZED_RELATIVE_DIR && r.c2 $ZED_STEM'
+CMD_4GL_LINK='r.l2 $ZED_STEM'
+CMD_PER_PREVIEW='cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && rm $ZED_STEM.42f'
+CMD_PER_COMPILE='cd $ZED_RELATIVE_DIR && fglform -M -W all $ZED_FILENAME && mv $ZED_STEM.42f ../42f/ && gsform -M -W all -i -import $ZED_FILENAME && mv $ZED_STEM.4fd ../4fd/'
+CMD_PER_FORM='cd $ZED_RELATIVE_DIR && r.gf $ZED_STEM 2 p'
+BUILD_OVERRIDES=0
+if [ "$HAVE_PY" = "1" ] && [ -f "$SETTINGS_JSON" ]; then
+    while IFS='|' read -r lang mode varname; do
+        [ -n "$lang" ] || continue
+        custom=$(read_build_tmpl "$lang" "$mode")
+        if [ -n "$custom" ]; then
+            mapped=$(map_tiptop_template "$custom")
+            eval "$varname=\$mapped"
+            BUILD_OVERRIDES=$((BUILD_OVERRIDES + 1))
+            info "ext.build.$lang.$mode 覆盖了默认模板：$mapped"
+        fi
+    done <<'PAIRS'
+4gl|preview|CMD_4GL_PREVIEW
+4gl|compile|CMD_4GL_COMPILE
+4gl|link|CMD_4GL_LINK
+per|preview|CMD_PER_PREVIEW
+per|compile|CMD_PER_COMPILE
+per|form|CMD_PER_FORM
+PAIRS
+fi
+if [ "$BUILD_OVERRIDES" = "0" ]; then
+    info "ext.build.* 未配置（或没有 python3 可读 JSON）：exec task 用内置默认模板"
+fi
+
 # settings 若已存在就不覆盖，改写到 .bdl-new
 SETTINGS_REL=".zed/settings.json"
 if [ -f "$SETTINGS_JSON" ]; then
@@ -631,6 +710,12 @@ TASKS_OUT=$(fill_template "$TASKS_TMPL" \
     '@@ORA_SERVICE@@' "$E_ORA_SERVICE" \
     '@@ORA_USER@@' "$E_ORA_USER" \
     '@@EXEC_FLAGS@@' "$EXEC_FLAGS" \
+    '@@CMD_4GL_PREVIEW@@' "$CMD_4GL_PREVIEW" \
+    '@@CMD_4GL_COMPILE@@' "$CMD_4GL_COMPILE" \
+    '@@CMD_4GL_LINK@@' "$CMD_4GL_LINK" \
+    '@@CMD_PER_PREVIEW@@' "$CMD_PER_PREVIEW" \
+    '@@CMD_PER_COMPILE@@' "$CMD_PER_COMPILE" \
+    '@@CMD_PER_FORM@@' "$CMD_PER_FORM" \
     '@@INIT_TAIL@@' "$INIT_TAIL")
 
 # 兜底断言（见 docs/PLAN.md R12）：Zed 会把 $… / ${…} 当成**自己的** task 变量，
