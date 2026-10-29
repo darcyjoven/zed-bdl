@@ -6,7 +6,7 @@
 |---|---|
 | 扩展 id | **`4gl-full`**（仓库 `zed-bdl`；可与只有 grammar 的轻量扩展 `bdl` 共存） |
 | 本手册对应版本 | 扩展 **`0.2.0`**（阶段见 [PLAN §7](PLAN.md)） |
-| 语言服务器 | `bdl-lsp` **v0.3.15**（Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`） |
+| 语言服务器 | `bdl-lsp` **v0.3.15**（Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`）；**函数级反查 Code Lens 需要 v0.3.16**（源码已就绪，Release 待发） |
 | 采集 / 部署 CLI | `tiptop` **v0.1.10**（四平台 GitHub Release + `SHA256SUMS`；2026-10-29 首次发布） |
 | 参照物 | VSCode 插件 `4gl-full` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏树视图） |
 | v1 承诺平台 | **Linux + Windows**（macOS 后续补齐） |
@@ -53,11 +53,11 @@
 | 只读 slash command（9 条）+ task 生成脚本 + 扩展 `capabilities` 声明 | Agent 面板 `/bdl-…`；`scripts/zed/init-workspace.{sh,ps1}`；自动（首次弹授权） | ✅ 0.2.0 已落地 | P1（Z-P1-1 / Z-P1-2 / Z-P1-3） |
 | 项目初始化（拉代码，task 可挂载）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → 自备 `scripts/init-project/` 同款脚本；迁移用生成脚本产出的 `.zed/bdl/migrate-data.{sh,ps1}` | ✅ 0.2.0 已落地（两者都有 task） | P1（Z-P1-2）/ P2（Z-P2-2） |
 | 表清单 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ 0.2.0 已落地 | P1（Z-P1-1） |
-| 链接关系查看：终端清单（当前替代）+ 就地 Code Lens | task 打印清单 / Code Lens 挂在 **MAIN** 上 | 🔧 计划中 | P2（Z-P2-2）→ 验证后 P3（Z-P2-1 / Z-P3-3） |
-| 反查引用（**函数级**口径） | Code Lens / `executeCommand` | 🔧 计划中 | P3（Z-P3-2 / Z-P3-3） |
-| 设置热更新 + `workspace/executeCommand` 通道 | 改 `settings` / slash 间接调用 | 🔧 计划中 | P3（Z-P3-1 / Z-P3-2） |
-| `bdl-lsp` / `tiptop` 自动下载 | 首次打开时按平台下载 | 🔧 计划中 | P4（Z-P4-1 / Z-P4-2） |
-| 下载状态提示 / 三方版本兼容提示 | 自动 / `/bdl-env-check` | 🔧 计划中 | P4（Z-P4-3 / Z-P4-4） |
+| 链接关系查看：Agent 面板文本清单 + 就地 Code Lens | slash `/bdl-link-chain` / Code Lens 挂在 **MAIN** 上 | ✅ 0.2.0 已落地（文本版）；✅ Code Lens 服务端已实现（`bdl-lsp` 0.3.15） | P2（Z-P2-2）→ P3（Z-P2-1 / Z-P3-3） |
+| 反查引用（**函数级**口径） | Code Lens「🔗 被 N 处调用」/ `executeCommand` | ✅ **已实现**（`bdl-lsp` 0.3.16）：函数定义那行显示调用数，点它跳到首处调用 | P3（Z-P3-3） |
+| 设置热更新 + `workspace/executeCommand` 通道 | 改 `settings` / slash 间接调用 | ✅ 0.2.0 已落地（热更新本来就有；`executeCommand` 通道 `bdl-lsp` 0.3.15） | P3（Z-P3-1 不采纳 / Z-P3-2） |
+| `bdl-lsp` / `tiptop` 自动下载 | 首次打开时按平台下载 | ✅ 0.2.0 已落地 | P4（Z-P4-1 / Z-P4-2） |
+| 下载状态提示 / 三方版本兼容提示 | 自动 / `/bdl-env-check` | ✅ 0.2.0 已落地 | P4（Z-P4-3 / Z-P4-4） |
 | 扩展注册表（zed.dev）发布 | 面板搜索安装 | 🔧 计划中 | P5（Z-P5-2，**未排期**） |
 | 侧边栏 / 树视图（链接资料视图、数据库字段视图） | — | ❌ 平台不支持 | 永久差异（§9） |
 | 状态栏 | — | ❌ 平台不支持 | 永久差异（§9） |
@@ -138,6 +138,7 @@ cd tiptop;  powershell -File scripts\build.ps1
 
 ```bash
 bdl-lsp version      # 期望 0.3.15（≥0.3.13 都可用；0.3.15 起有 executeCommand / Code Lens / 项目符号）
+                      # 0.3.16 起还有函数级反查 Code Lens（见 §3.3）
 tiptop  version      # 期望 0.1.10
 ```
 
@@ -407,16 +408,21 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 > 📷 待补：`tiptop link status` 的中文输出（链数、生成时间、模组根）（docs/images/zed/09-link-status.png）
 > 🎬 待补：`tiptop link sync` 全量采集进度（采集/扫描源码/成链/写入完成）（docs/images/zed/10-link-sync-progress.mp4）
 
-### 3.2 在 Zed 里查看链接关系 [✅ 文本版（`/bdl-link-chain`）/ ✅ Code Lens 服务端已实现（点击行为待实机）]
+### 3.2 在 Zed 里查看链接关系 [✅ 文本版（`/bdl-link-chain`）/ ✅ Code Lens 服务端已实现]
 
-**Code Lens 已由 `bdl-lsp` 实现**（`textDocument/codeLens`，2026-10-29）：把**链内子文件**各做一条 Code Lens 挂在 **MAIN 程序块**那一行（数据来自链接资料内存树），标题是 `模组/代码`，**上限 `link.lensMax`（默认 10）**，超出时最后一条是纯文本汇总；文件不在磁盘上时给纯文本（不挂命令，避免点了没反应）。
+**Code Lens 已由 `bdl-lsp` 实现**（`textDocument/codeLens`，2026-10-29）：把**链内子文件**各做一条 Code Lens 挂在 **MAIN 程序块**那一行（数据来自链接资料内存树），标题是 `模组/代码`，**上限 `link.lensMax`（默认 10）**，超出时最后一条是**汇总**（标题形如 `…另有 2 个链内文件`，**点它会弹出提示**说明还剩多少）；文件不在磁盘上时也会显示标题（点它弹提示说明"资料里有、磁盘上没有"），不会让你以为功能坏了。
 
 怎么用：① 采集链接资料；② `link.mode` 不是 `off`；③ 在 `languages."Genero BDL"` 下开 `"code_lens": "on"`（**默认 `off`**）。Code Lens 是**宿主的 LSP 客户端功能**，服务端实现即可渲染。
 
-> **点击行为待实机确认（PLAN Z-P2-1）**：Zed 是否把 lens 的 `command` 转成 `workspace/executeCommand`、以及是否支持服务端反向的 `window/showDocument`。命令是 `bdl.openLink`；即使点击不生效，也可从 **`lsp command selector`** 手动触发同一条命令（兜底），或者用上面的 `/bdl-link-chain` 文本视图。
+> **点击链路已由 Zed 源码证实**（2026-10-29 核对 zed-industries/zed main 分支）：点击 lens 的标题会触发
+> `workspace/executeCommand`（命令 `bdl.openLink`），服务端再反向发 `window/showDocument`，
+> Zed **支持**这个反向请求并会**真的打开目标文件**。所以点击 lens 打开链内文件是预期行为。
+> 即使点击没反应，也可从 **`lsp command selector`** 手动触发同一条命令（兜底），或者用下面的 `/bdl-link-chain` 文本视图。
 > 前置已满足：**`bdl-lsp v0.3.15` 已发布**（2026-10-29），自动下载与手工安装都能拿到 Code Lens / `executeCommand` / 项目符号。
 
-> **Z-P2-1 是硬前置**：需要有 GUI 的机器验证 ① 同一 range 的多条 lens 是否各占一行；② 点击 lens 的 `command` 能否执行 `workspace/executeCommand` 并打开目标文件。若 ② 不成立就改用备选方案（终端清单 + 命令面板）并同步改文档。
+> ⚠️ **一条容易踩的坑（已修）**：Zed 只显示 lens **自带的标题**（`command.title`）。如果一条 lens
+> 没有可点击的命令，Zed 会显示成一个**假的**「0 references」。所以本扩展的所有"说明性"一行
+> （汇总、文件不在磁盘）都挂了自己的命令（`bdl.showInfo`，点了弹提示），不会显示成假信息。
 
 > 📷 待补：Code Lens 挂在 MAIN 上（开 code_lens: "on" 后）（docs/images/zed/11-code-lens-main.png）
 
@@ -430,13 +436,24 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 
 > 📷 待补：终端清单里 MAIN 与子文件路径清单（docs/images/zed/12-link-tree-terminal.png）
 
-### 3.3 反查引用 [🔧 计划中·P3 / ⬇️ 降级替代]
+### 3.3 反查引用 [✅ 已实现（函数级 Code Lens，bdl-lsp 0.3.16）/ ⬇️ 与 VSCode 的差异见下]
 
 **口径**：Zed 侧采用**函数级**反查（「这个函数被哪些作业调用」），**不做** VSCode 那种
 「反查引用程序 + 分页」的完整视图。
 
-- 计划：函数定义处显示「被 N 处调用」并可跳转（Code Lens / `workspace/executeCommand`，Z-P3-2 / Z-P3-3）。
-- 今天（降级）：用 Zed 原生**查找引用**看工作区**可解析**的引用（依赖符号索引；跨模组调用需链接资料才能解析）；整体统计用 `tiptop link status -root .`；要精确到「哪些 MAIN」就读 `.project/link/links.jsonl` 自己筛。
+- ✅ **已实现**（`bdl-lsp` 0.3.16）：打开一个 `.4gl` 后，**被调用过的函数**会在函数定义那一行
+  出现一条 Code Lens，形如 `🔗 函数名 被 3 处调用（点开首处 4gl/axmt620.4gl:128）`。
+  **点它就跳到第一处调用**（打开那个文件并定位到那一行）。要看**全部**调用点，
+  用 Zed 原生的**查找引用**（把光标放在函数名上 → `editor: find all references`）。
+- **口径与「查找引用」一致**：只统计**能跨文件看到**的调用点 —— 本模组 + 全局模组
+  （`sub` / `lib` / `qry`）。别的模组里的同名函数不计入，所以数字不会虚高。
+- **前提**：需要工作区索引（`index.enable` 为开，默认开）。**索引还没建好时不显示这些 lens**
+  —— 这是正常现象，不是故障；等索引建好（或看 `zed: open log` 里的索引进度）就会出现。
+- **上限**：一个文件最多显示 10 条，超出会给一条汇总（标题形如 `…另有 3 个被调用的函数`，
+  **点它会弹出提示**说明还剩多少）。要改上限请改服务端配置 `link.lensMax` 之外的独立项
+  （目前反查条数上限为服务端常量 10）。
+- **与 VSCode 的差异**：VSCode 是侧边栏里「反查引用程序 + 分页」列出**哪些 MAIN 程序**引用了它；
+  Zed 侧是**就地**显示调用**次数**并跳到第一处，完整列表请用「查找引用」。
 - **明确不采纳**：`Call Hierarchy`（语义是调用关系 ≠ 链接关系）、`documentLink`（位置分散）、把链接资料塞进 `documentSymbol`（会产生不可跳转的假符号）。
 
 ### 3.4 账号与密码 [✅ 当前可用]
@@ -1090,8 +1107,8 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | 命令面板注册 | ✅ **33 条**命令 | ❌ **无命令注册 API** | ⬇️ task（写盘/长任务）+ slash command（只读） |
 | 侧边栏树视图（链接资料 / 数据库字段） | ✅ **2 个 TreeView** | ❌ **无树视图 API** | ⬇️ 链接用 **Code Lens 挂 MAIN**（P3）；字段用 slash 文本（P1） |
 | 树的操作（过滤/勾选/批量/复制列定义） | ✅ | ❌ 无 | ⬇️ 过滤=子串 + `^` / `$` 锚点参数；批量=`-tables`/`-tables-file`；复制=抄文本 |
-| 反查引用程序 | ✅ 视图 + 分页 | 🔧 函数级口径 | Zed 不做「引用程序 + 分页」视图 |
-| 局部查看链接关系 | ✅ Code Lens（VSCode 侧 P1-8） | 🔧 同一份服务端实现 | 两端共用一份 `textDocument/codeLens` |
+| 反查引用程序 | ✅ 视图 + 分页 | ✅ **函数级口径**（Code Lens「被 N 处调用」，`bdl-lsp` 0.3.16） | Zed 不做「引用程序 + 分页」视图；用原生「查找引用」看全部 |
+| 局部查看链接关系 | ✅ Code Lens（VSCode 侧 P1-8） | ✅ 同一份服务端实现 | 两端共用一份 `textDocument/codeLens` |
 | 上传/下载 | ✅ 命令 + **右上角按钮** + 右键 | ✅ task | ⬇️ 按钮 → 命令面板 + keymap |
 | 编译/链接/预览（生产端） | ✅ 命令 + 按钮组（`.4gl`/`.per` 不同） | ✅ task → `tiptop exec` | 命令与模板一致；**不自动上传** |
 | 整包部署 | ⚠️ 只有 CLI 用法 | ✅ CLI 用法 | 两端都不进扩展 |

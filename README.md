@@ -13,7 +13,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 > - v1 验证平台：**Linux + Windows**（macOS 后续补齐）。
 
 **版本**：扩展 `0.1.1` → 目标 `0.2.0`（追平中，阶段见 [PLAN §7](docs/PLAN.md)）。
-后端：`bdl-lsp` **v0.3.15**（四平台 Release；含 executeCommand / Code Lens / workspaceSymbolProvider）· `tiptop` **v0.1.10**（四平台 Release）。
+后端：`bdl-lsp` **v0.3.15**（四平台 Release；含 executeCommand / Code Lens / workspaceSymbolProvider；**函数级反查需 v0.3.16**，源码已就绪、Release 待发）· `tiptop` **v0.1.10**（四平台 Release）。
 
 ---
 
@@ -30,7 +30,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 | 语义高亮 | `"semantic_tokens": "combined"` | ✅ `0.2.0`：扩展自带 `semantic_token_rules.json`（8 条规则，带主题回退） |
 | 设置生效与轻量档默认 | 自动 | ✅ `0.2.0`：有效配置从 `initializationOptions` 下发，且缺省补 `link/schema mode=off` |
 | 链接资料采集 / 导入 / 更新 | task → `tiptop link …` | ✅ 可用 |
-| 链接关系查看 | `/bdl-link-chain <代码>`（文本）/ Code Lens 挂在 **MAIN 函数头** | ✅ 文本版可查；✅ Code Lens **服务端已实现**（`bdl-lsp`，开 `"code_lens": "on"` 后可见；**点击行为待 Zed 实机确认**） |
+| 链接关系查看 | `/bdl-link-chain <代码>`（文本）/ Code Lens 挂在 **MAIN 函数头** | ✅ 文本版可查；✅ Code Lens **服务端已实现**（`bdl-lsp`，开 `"code_lens": "on"` 后可见；**点击链路已由 Zed 源码证实**：点击 → `workspace/executeCommand` → `window/showDocument` 打开目标文件） |
 | 字段资料采集 / 同步 | task → `tiptop schema …` | ✅ 可用 |
 | 表 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ `0.2.0`：`/bdl-schema-tables`、`/bdl-schema-columns` |
 | 上传 / 下载 / 预演上传（单文件） | task → `tiptop upload` / `download` | ✅ 可用 |
@@ -294,14 +294,14 @@ tiptop deploy -list
 |---|---|---|---|
 | 语言智能 | ✅ | ✅ | 同一个 `bdl-lsp`，行为一致 |
 | 命令面板 | ✅ 33 条 | ⬇️ task + slash command | Zed 无命令注册 API |
-| 链接资料视图 | ✅ 侧边栏三级树 | ⬇️ Code Lens 挂 MAIN 函数头 | Zed 无树视图 API；每子文件一条、上限 10 + 纯文本汇总；服务端已实现，点击行为待实机确认 |
+| 链接资料视图 | ✅ 侧边栏三级树 | ⬇️ Code Lens 挂 MAIN 函数头 | Zed 无树视图 API；每子文件一条、上限 10 + 汇总行（点了弹提示）；服务端已实现，点击链路已由源码证实 |
 | 字段资料视图 | ✅ 树 + 过滤 + 勾选 | ⬇️ slash 文本列表 | 过滤靠正则参数；批量同步用 task |
 | 进度条 / 取消 | ✅ 通知栏 | ⬇️ task 终端 + 重跑取消 | — |
 | 输出面板 | ✅ `4gl` / `4gl 任务` | ⬇️ task 终端 + `zed: open log` | — |
 | 编译错误进 Problems | ✅ | ❌ 永久差异 | 只看终端输出 |
 | 编辑器标题栏 / 右键按钮、状态栏 | ✅ | ❌ 永久差异 | 改用命令面板 + task + keymap |
 | 二进制分发 | ✅ VSIX 内置 | 🔧 运行时自动下载（计划中） | `bdl-lsp` 已有 Release，`tiptop` 待建 |
-| 反查引用 | ✅ 视图分页 | ⬇️ 函数级口径 | 数据来自 LSP 链接资料索引 |
+| 反查引用 | ✅ 视图分页 | ✅ 函数级口径（Code Lens「🔗 被 N 处调用」，`bdl-lsp` 0.3.16） | 点它跳到首处调用；看全部用 Zed 原生「查找引用」 |
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **盘点日期**：2026-10-28（本次为**全量重写**，旧 PLAN 已删除）
 > **参照物**：VSCode 插件 `vscode-bdl` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏视图）
-> **后端基线**：`bdl-lsp` **v0.3.15**（四平台 Release，2026-10-29）· `tiptop` **v0.1.10**（四平台 Release，2026-10-29）
+> **后端基线**：`bdl-lsp` **v0.3.16**（源码；最新四平台 Release 是 **v0.3.15**，0.3.16 待打 tag）· `tiptop` **v0.1.10**（四平台 Release，2026-10-29）
 > **本仓库基线**：`zed-bdl` **0.1.1**（目标 0.2.0 起分阶段推进）
 > **目的**：以 VSCode 侧**当前**已有进度为基准，把 Zed 侧推进到同等能力；平台做不到的部分**逐条给出已确认的降级方案**，不留"两边不一样"的模糊状态。
 >
@@ -48,7 +48,7 @@
 | 组件 | 版本 / 状态 | 证据 |
 |---|---|---|
 | `vscode-bdl`（4gl-full） | **0.9.2**，`bin/` 内置 `bdl-lsp` + `tiptop`，33 命令 / 50 设置键 / 2 视图 / 55 条 menus / 27 activationEvents / 0 keybindings | `vscode-extension/package.json:2,5,60,531-1019` |
-| `bdl-lsp` | 源码 **0.3.15**，tag `v0.3.15`（2026-10-29 发布，含 executeCommand / Code Lens / workspaceSymbolProvider），`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS` | `bdl-lsp/main.go:35`、`release.yml` |
+| `bdl-lsp` | 源码 **0.3.16**（`9ca180a`：函数级反查 Code Lens + `bdl.showInfo`）；最新 tag `v0.3.15`（2026-10-29 发布，含 executeCommand / Code Lens / workspaceSymbolProvider），`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS` | `bdl-lsp/main.go:35`、`release.yml` |
 | `tiptop` | **v0.1.10**（2026-10-29 首次发布）；新增 `release.yml`：tag `v*` → 四平台产物 + `SHA256SUMS` | `tiptop/main.go:40`、`.github/workflows/release.yml` |
 | `zed-bdl`（本仓库） | **0.2.0**（P0 已落地）；`src/` 拆为 `lib.rs` + `config.rs` + `binary.rs`；10 个 `.scm`；**17 项**清单校验 + 47 项 query 校验 + 3 个单元测试 | `extension.toml:4`、`Cargo.toml:3`、`tests/` |
 | 本地已构建二进制 | `bdl-lsp 0.3.13`、`tiptop 0.1.8` —— **都过期**，`tiptop` 旧二进制缺 `download` / `-region` / `-login-profile` | 实跑 `artifacts/bin/* version` |
@@ -69,7 +69,7 @@
 | 旧结论 | 实测更正 |
 |---|---|
 | 「Zed 侧原样透传用户设置，服务端兜底 true」 | **更严重**：`lsp.bdl-lsp.settings` 根本不会到达 `bdl-lsp`（服务端从不发 `workspace/configuration`）。自定义键、`link.mode`、`diagnostics` 在 Zed 上今天**全部无效**。→ Z-P0-3 / Z-P3-1 |
-| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已完全满足**：`bdl-lsp`（**v0.3.15**）与 `tiptop`（v0.1.10）都有四平台 Release + `SHA256SUMS`。→ Z-P4-1 / Z-P4-2 均已落地 |
+| 「二进制自动下载的前置是 bdl-lsp 要有 Release」 | **前置已完全满足**：`bdl-lsp`（**v0.3.15**，源码已到 0.3.16）与 `tiptop`（v0.1.10）都有四平台 Release + `SHA256SUMS`。→ Z-P4-1 / Z-P4-2 均已落地 |
 | 「跨仓库文档 `bdl-lsp/docs/PENDING.md` 是待办唯一清单」 | 该文件**已不存在**（现只有 `DIAGNOSTICS.md` + `FEATURES.md`）；VSCode 侧唯一待办是 `vscode-bdl/docs/TODO.md`，Zed 侧唯一待办是**本文件**。 |
 
 > 另需注意：`vscode-bdl/docs/FEATURES.md` 头部仍写 0.6.2、`COMMANDS.md` 里的命令数与设置键数互相矛盾、文档写了 `bdl/linkReferences` 但源码从未发送该请求。**追平时一律以源码/`package.json` 为准，不要抄 VSCode 侧文档的数字。**
@@ -279,14 +279,14 @@ zed.dev 官方语义：
 | 整包部署（预演/列目标/执行） | ✅ CLI 用法 | ❌ | ⬇️ task 调 `tiptop deploy`；只读的预演/列目标另有 slash command | Z-P1-1 / Z-P1-2 |
 | 项目初始化（拉代码） | ✅ 向导 + 集成终端 | ❌ | ⬇️ task 调 `scripts/init-project` 同款脚本（终端内交互；生成脚本可写入） | Z-P1-2 |
 | 迁移旧资料目录（`.link/` → `.project/link/`） | ✅ 命令 | ❌ | ✅ **0.2.0 已落地**：生成脚本产出 `.zed/bdl/migrate-data.{sh,ps1}` + task（只搬移、绝不覆盖，空旧目录顺手删） | Z-P2-2 |
-| 反查引用程序 | ✅ 视图分页 | ❌ | ⬇️ **函数级反查**，落到 Code Lens / `executeCommand` | Z-P3-2 / Z-P3-3 |
+| 反查引用程序 | ✅ 视图分页 | ❌ | ⬇️ **函数级反查已实现**（`bdl-lsp` 0.3.16，`9ca180a`）：函数定义那行挂「🔗 函数名 被 N 处调用」，点它跳到第一处调用；要看全部用 Zed 原生「查找引用」 | Z-P3-3 ✅ |
 | 进度通知 + 取消 | ✅ | ❌ | ⬇️ task 终端原样输出 + 重跑取消（生成脚本已给 6 条 exec + deploy 加 `allow_concurrent_runs`） | Z-P1-2 |
 
 ### 6.3 视图与输出
 
 | 能力 | VSCode 0.9.2 | Zed 现状 | 处置 | 任务 |
 |---|---|---|---|---|
-| 链接资料三级树（点击跳转） | ✅ | ❌ 无树视图 API | ⬇️ **Code Lens 挂在 MAIN 函数头**：✅ **服务端已实现**（`bdl-lsp c0102a2`，每子文件一条、`link.lensMax` 上限 10 + 纯文本汇总、`bdl.openLink` → `window/showDocument`）；**点击行为待实机**（Z-P2-1） | Z-P3-3 ✅ |
+| 链接资料三级树（点击跳转） | ✅ | ❌ 无树视图 API | ⬇️ **Code Lens 挂在 MAIN 函数头**：✅ **服务端已实现**（`bdl-lsp c0102a2`，每子文件一条、`link.lensMax` 上限 10 + 汇总行、`bdl.openLink` → `window/showDocument`）；**点击链路已由 Zed 源码证实**（`apply_code_action` → `workspace/executeCommand`；`window/showDocument` 会真的打开文件），**只剩实机看观感**（Z-P2-1） | Z-P3-3 ✅ |
 | 字段资料树（正则过滤/勾选/批量/复制列定义） | ✅ | ❌ | ⬇️ **0.2.0 已落地** `/bdl-schema-tables`（子串 + `^`/`$` 锚点）+ `/bdl-schema-columns`；悬停与补全承担"看列说明"；批量同步用 task 的 `-tables`/`-tables-file`。**与 VSCode 的差异**：无勾选/多选、无完整正则、无「复制列定义」 | Z-P1-1 |
 | 输出面板（`4gl` / `4gl 任务`） | ✅ | ❌ | ⬇️ task 终端 + `zed: open log` | §8 |
 | 编译错误回写 Problems | ✅ | ❌ | ❌ 永久差异：只看终端 | §8 |
@@ -366,6 +366,20 @@ cargo build --release --target wasm32-wasip2
 > **Z-P2-4 ①② 已完成**（deploy.json 合成 + ext.build.* 回读，测试场景二/四）。
 > **Z-P3-3 已完成、Z-P2-1 转为"验收"**：服务端 Code Lens 已实现（`bdl-lsp c0102a2`，6 个测试含反向请求），
 > 现在 Z-P2-1 要确认的只剩 Zed 侧的**渲染与点击**（多条同 range 是否各占一行、点击是否执行 `bdl.openLink`）。
+>
+> **★ Z-P2-1 的两条关键不确定性已由源码证实（2026-10-29，查 zed-industries/zed main 分支）**：
+>
+> | 问题 | 结论 | 证据 |
+> |---|---|---|
+> | 点击 lens 会不会执行 `workspace/executeCommand`？ | **会**。Zed 走 `project.apply_code_action` → `workspace/executeCommand`；但命令**必须在服务端 `executeCommandProvider.commands` 里声明过**，否则被静默跳过 | `crates/project/src/lsp_store.rs` 的 `apply_code_action`（`available_commands.contains(&command.command)` 才发） |
+> | 服务端反向的 `window/showDocument` 会被 Zed 支持吗？ | **支持，而且会真的打开文件**。客户端能力里 `show_document: Some(support: true)`；`file:` URI → 打开成新标签并返回 `success: true`（非 `file:` scheme 才返回 false） | `crates/lsp/src/lsp.rs:1153`；`crates/project/src/lsp_store.rs:1309` 注册 handler；`crates/editor/src/items.rs` 的 `handle_lsp_show_document`（`workspace.open_abs_path` → `respond(success)`） |
+>
+> ⇒ **`bdl.openLink` 的链路是通的**，实机只需确认"看起来对不对"（渲染位置、多条是否各占一行）。
+> ⇒ 同时查出一条**必须遵守的硬约束**：**Zed 只显示 `lens.command.title`**；没有 command 的
+> lens 会先渲染占位、等 `codeLens/resolve` 补标题，服务端不声明 `resolveProvider` 时就永远占位，
+> 最终回落到一个**假的**「0 references」文本（`crates/editor/src/code_lens.rs` 的 `EMPTY_LENS_FALLBACK_TITLE`）。
+> **所以"纯文本汇总行"在 Zed 里是陷阱** —— 已在 `bdl-lsp` 侧改用新命令 `bdl.showInfo`
+> （弹 `window/showMessage`），并加测试 `TestEveryLensHasCommand` 锁定这条不变量。
 
 | # | 任务 | 落点 | 验收 | 写作用域 |
 |---|---|---|---|---|
@@ -376,13 +390,13 @@ cargo build --release --target wasm32-wasip2
 
 ### P3 · 跨仓库（executeCommand / Code Lens / tiptop Release 已授权；标 ⚠️ 的两项待确认）
 
-> **进展（2026-10-29）**：**Z-P3-2 已完成**（`bdl-lsp@9e48960`：`workspace/executeCommand` + 5 条命令，5 个协议级用例通过，`go test ./...` 全绿）。**Z-P3-4 已完成**（`tiptop` release.yml + tag **v0.1.10**，四平台产物 + `SHA256SUMS` 实测可用）。**Z-P3-3（Code Lens）已完成**（`bdl-lsp c0102a2`，服务端 6 个测试全绿）。**Z-P3-6 已完成并随 v0.3.15 发布**（`bdl-lsp d88cd97`：声明 `workspaceSymbolProvider`；本地 0.3.15 构建握手实测三个 capability 都在）。**Z-P3-1 经证据推翻、不采纳**（Zed 用 `didChangeConfiguration` 推设置，热更新本来就有）。**v0.3.15 已打 tag 并出包**（四平台 + SHA256SUMS）。
+> **进展（2026-10-29）**：**Z-P3-2 已完成**（`bdl-lsp@9e48960`：`workspace/executeCommand` + 5 条命令，5 个协议级用例通过，`go test ./...` 全绿）。**Z-P3-4 已完成**（`tiptop` release.yml + tag **v0.1.10**，四平台产物 + `SHA256SUMS` 实测可用）。**Z-P3-3（Code Lens）已完成**（`bdl-lsp c0102a2`，服务端 6 个测试全绿）。**Z-P3-3 续：函数级反查也已完成**（`bdl-lsp@9ca180a`，源码 0.3.16）：给被调用过的函数挂「🔗 被 N 处调用」；同时**修掉一个只有 Zed 才会暴露的坑** —— Zed 只显示 `lens.command.title`，没有 command 的 lens 会回落到**假的**「0 references」，所以所有汇总/说明行改用新命令 `bdl.showInfo`（弹 `window/showMessage`），并加测试 `TestEveryLensHasCommand` 锁定不变量。**Z-P3-6 已完成并随 v0.3.15 发布**（`bdl-lsp d88cd97`：声明 `workspaceSymbolProvider`；本地 0.3.15 构建握手实测三个 capability 都在）。**Z-P3-1 经证据推翻、不采纳**（Zed 用 `didChangeConfiguration` 推设置，热更新本来就有）。**v0.3.15 已打 tag 并出包**（四平台 + SHA256SUMS）；**0.3.16 源码已推，tag 待打**。
 
 | # | 任务 | 仓库 | 要做的事 | 验收 |
 |---|---|---|---|---|
 | ~~**Z-P3-1**~~ ❌ **不采纳** | `workspace/configuration` 支持 | `bdl-lsp` | **证据推翻需求**：Zed 主动推 `didChangeConfiguration`（启动 `lsp_store.rs:694-721`、变化时 `:9831-9932`），`bdl-lsp` 已在处理并热应用；再加 `workspace/configuration` 只是冗余 | — |
 | **Z-P3-2** | `workspace/executeCommand` 通道 | `bdl-lsp` | 加 `ExecuteCommandProvider`，把 `bdl/linkTree` / `bdl/linkReferences` / `bdl/schemaTables` / `bdl/schemaColumns` / `bdl/forceParse` 转接为标准命令（参数用 `arguments` 数组） | 协议级测试；VSCode 侧继续用自定义请求，**不受影响** |
-| **Z-P3-3** ✅ | `textDocument/codeLens`（**与 VSCode 侧 P1-8 同一份实现，两端共用**） | `bdl-lsp` | 链内子文件各一条 lens 挂 **MAIN 那一行**（数据来自 `link.Resolver.Tree()`，纯内存）；上限 `link.lensMax`（默认 10）+ 纯文本汇总；点击命令 `bdl.openLink` → 反向 `window/showDocument` | ✅ **已完成**（`c0102a2`）：6 个测试（lens 数量/顺序/纯文本/上限汇总/自我排除 + 协议端到端 + capability + 反向请求）；**Zed 侧渲染与点击待实机**（Z-P2-1） |
+| **Z-P3-3** ✅ | `textDocument/codeLens`（**与 VSCode 侧 P1-8 同一份实现，两端共用**） | `bdl-lsp` | 链内子文件各一条 lens 挂 **MAIN 那一行**（数据来自 `link.Resolver.Tree()`，纯内存）；上限 `link.lensMax`（默认 10）+ 汇总行；点击命令 `bdl.openLink` → 反向 `window/showDocument`。**续**：函数级反查（`9ca180a`，0.3.16） | ✅ **已完成**（`c0102a2` + `9ca180a`）：链接 lens 6 个测试 + 反查 4 个 + 「每条 lens 必须带 command」不变量测试；**Zed 侧渲染与点击的链路已由 Zed 源码证实**（只剩实机看观感，Z-P2-1） |
 | **Z-P3-4** ✅ | tag + 四平台 Release | `tiptop` | **已完成**：新增 `release.yml`（tag `v*` + dispatch，四平台原生 runner，检出兄弟目录 bdl-lsp；ref = 显式输入 > bdl-lsp 最近 Release tag > main），已打 **v0.1.10** 并推送 | ✅ Release v0.1.10 实测有 4 个产物 + `SHA256SUMS`；下载校验和通过、`tiptop version` = 0.1.10、`download`/`exec` 子命令在 |
 | **Z-P3-5** | 文档同步 | `bdl-lsp` / `tiptop` | `FEATURES.md` 补 `workspace/configuration`、`executeCommand`、Code Lens 行；`tiptop` 补 Release | 两处口径一致 |
 | **Z-P3-6** ✅ | 声明 `workspaceSymbolProvider: true` | `bdl-lsp` | **已完成**（`d88cd97`，随 v0.3.15 发布）：服务端一直在处理 `workspace/symbol`，Zed 对 `None` 的 server 直接跳过（`crates/project/src/lsp_store.rs:9438-9447`）；声明后「项目符号」能搜到 4GL 函数 | 本地 0.3.15 握手实测 `workspaceSymbolProvider: true`；实机按 §11.2 #19 复验 |
@@ -515,11 +529,11 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | 10b | **task 没被变量过滤** | `task: spawn` 列表里能看到全部 21 条 `4gl:` task（**尤其 6 条 exec**：它们的 `-command` 里含 Zed 变量，写错会被过滤掉）；已存在的 `settings.json` 不被覆盖（写 `.bdl-new`） | P1 |
 | 10c | capability | 首次使用 slash command 触发 `process:exec` 时，Zed **不会**报 "capability ... was not listed in the extension manifest"；若用户收紧了 `granted_extension_capabilities`，按文档放行同形状 | P1 |
 | 11 | **Code Lens ①** | 开 `code_lens: "on"`：MAIN 那行出现链内子文件 lens，**同一 range 的多条各占一行** | P3（服务端已实现） |
-| 12 | **Code Lens ②** | 点击 lens → `bdl.openLink` → 服务端反向 `window/showDocument` 打开目标文件。**若点击无反应**：从 `lsp command selector` 手动跑 `bdl.openLink`（会给出明确错误），或改用 `/bdl-link-chain` | P3（已实现，待实机） |
-| 13 | Code Lens ③ | 链内文件数 > `link.lensMax`（默认 10）时只显示前 N 条 + 一条**纯文本**汇总（点了无反应是预期的）；把 `Settings.ext` 之外的 `link.lensMax` 调小可复现 | P3（已实现） |
-| 14 | 函数级反查 | **未实现**：Code Lens 目前只列链接（链内子文件），不做"被 N 处调用"；候选数据（`wsindex.CallsOf`）已有，等明确需求再排（§7 Z-P3-3 备注） | 未排期 |
+| 12 | **Code Lens ②** | 点击 lens → `bdl.openLink` → 服务端反向 `window/showDocument` 打开目标文件。**源码已证实这条路是通的**（Zed 注册了 `ShowDocument` handler，`file:` URI 会真的打开并返回 `success: true`）。**若点击无反应**：从 `lsp command selector` 手动跑 `bdl.openLink`（会给出明确错误），或改用 `/bdl-link-chain` | P3（已实现，链路已由源码证实，待实机确认观感） |
+| 13 | Code Lens ③ | 链内文件数 > `link.lensMax`（默认 10）时只显示前 N 条 + 一条**汇总**（标题「…另有 N 个链内文件」，**点了会弹提示**说明还剩多少 —— 这是 `bdl.showInfo` 命令；不再是"点了没反应"的纯文本）；把 `link.lensMax` 调小可复现 | P3（已实现） |
+| 14 | **函数级反查** | ✅ **已实现**（`bdl-lsp` 0.3.16）：函数定义那行出现「🔗 函数名 被 N 处调用（点开首处 …）」，点它跳到**第一处调用**。口径与「查找引用」一致（只算可达模组：本模组 + 全局模组）。要看全部调用点用 Zed 原生「查找引用」。**依赖工作区索引**，索引没建好时不显示（属正常，不是故障） | P3（已实现，待实机） |
 | 15 | 设置热更新 | 改 `settings`（例如 `diagnostics` 级别）后**无需重启**即生效；`zed: open log` 里应出现 bdl-lsp 的 `配置已更新` | P3（已由源码解释，实机顺手确认） |
-| 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功（应拿到 **bdl-lsp v0.3.15** / tiptop v0.1.10）；**删掉扩展目录里的 `bdl-lsp-*` 缓存目录**再打开 `.4gl` 应重下；离线时应复用缓存而不是报错；失败有可操作提示 | P4（已实现） |
+| 16 | 自动下载 | 无 `bdl-lsp`/`tiptop` 时自动下载成功（应拿到 **bdl-lsp v0.3.16** / tiptop v0.1.10）；**删掉扩展目录里的 `bdl-lsp-*` 缓存目录**再打开 `.4gl` 应重下；离线时应复用缓存而不是报错；失败有可操作提示 | P4（已实现） |
 | 17 | 路径含空格与中文 | 诊断/跳转/下载/上传均正常（Windows 尤其） | P1/P4 |
 | 18 | ABI 15 ↔ Zed tree-sitter 运行时 | 高亮/outline 正常（若异常，是 grammar 兼容问题，需换 rev） | P0 |
 | 19 | **项目符号搜索** | `project symbols: toggle` 能搜到 BDL 函数（`bdl-lsp ≥ 0.3.15` 已声明 `workspaceSymbolProvider`；0.3.15 之前预期搜不到） | P3（Z-P3-6 已修，待实机） |
@@ -533,7 +547,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | # | 风险 | 说明 | 缓解 |
 |---|---|---|---|
 | R1 | **误判 Zed API 能力** | 旧文档已出现三处过时结论（语义 token、无法执行命令、Code Lens 替代树视图的语义）。Zed 宿主源码本机不存在，manifest 与设置语义靠官方文档 + GitHub main 分支核对 | §4 每条都带证据；动手前先在本机 crate 源码里确认；实机验证优先 |
-| R2 | **Code Lens 点击行为未知** | Zed 是否把 lens 的 `command` 转成 `workspace/executeCommand`、能否打开文件，未经实机验证 | Z-P2-1 必须先做；备选：终端清单 + `lsp command selector`，或 `window/showDocument`（同样需验证） |
+| R2 | ~~**Code Lens 点击行为未知**~~ **已由源码证实** | Zed 把 lens 的 `command` 转成 `workspace/executeCommand`（`crates/project/src/lsp_store.rs` 的 `apply_code_action`），**命令必须在服务端 `executeCommandProvider.commands` 里声明过**否则静默跳过；反向的 `window/showDocument` **Zed 支持**（客户端能力 `show_document: Some(support: true)`，`file:` URI 会真的打开文件并返回 `success: true`，`crates/editor/src/items.rs` 的 `handle_lsp_show_document`） | 已在 `bdl-lsp` 侧落地（`bdl.openLink` / `bdl.showInfo` 都已进 `executeCommandIDs()`）；实机只需确认观感（Z-P2-1）。**新踩到的坑**：Zed 只显示 `lens.command.title`，没有 command 的 lens 会回落成**假的**「0 references」→ 所有汇总行必须带 command |
 | R3 | **grammar rev 漂移** | `extension.toml` 固定 `ad54d64…`（tree-sitter-bdl 本地 HEAD 已 `76ddcd3…`）；`bdl-lsp/go.mod` 用 tag `v1.0.1`；`zed-ext` 注册表另一扩展固定 `c832493e…` → 高亮/outline 与后端解析可能不一致 | 每轮升级 grammar 时三处一起对齐；`verify-queries.mjs` 必须绿 |
 | R4 | **slash command 静默失效** | `extension.toml` 声明与 Rust `match` 名对不上时编译通过但命令不响应 | Z-P0-6 校验脚本专门拦这个 |
 | R5 | **配置下发路径改错的回归** | Z-P0-3 改了初始化参数，可能覆盖用户显式配置 | 优先级固定为 `initialization_options` > `settings` > 默认值；补诊断级单测/实机验证（清单 4、5） |
@@ -545,6 +559,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 | R11 | **版本三仓库独立递增** | 无兼容矩阵，混装症状隐蔽 | Z-P4-4 的版本提示；文档给最低/推荐版本表 |
 | R12 | **tiptop 模板占位符在 Zed task 里会失效**（本轮实测） | VSCode 的 `bdl.build.*.command` 用 `${path}`/`${name}`/`${fullname}`，由插件展开后交给 tiptop；Zed 的 task 会把 `$…`/`${…}` 当**自己的变量**——未知变量要么让整条 task 被 `task: spawn` 过滤掉，要么展开成空串，远端命令直接跑错 | 生成脚本与文档统一改用 Zed 变量：`${path}`/`${fullpath}` → `$ZED_RELATIVE_DIR`、`${name}` → `$ZED_STEM`、`${fullname}` → `$ZED_FILENAME`；`tests/verify-init-script.py` 断言产物不含 `${` |
 | R13 | **`settings.ext.*` 的消费者**（本轮盘点发现，**已解决**） | 原状：扩展不读 `ext.build.*` / `ext.prod.deploy.*`，task 也读不到设置 → 上传/部署没有配置、模板改了不生效 | ✅ Z-P2-4 已补：生成脚本合成 `.project/deploy/deploy.json`，并在重跑时回读 `ext.build.*` 写进 task。**仍只是记录**的只剩 `ext.deploy.enable` / `ext.build.enable`（Zed 无按钮显隐，文档写明） |
+| R14 | **Zed 的 Code Lens 只显示 `command.title`**（本轮由源码发现，**已解决**） | 没有 command 的 lens 在 Zed 里会先渲染占位，等 `codeLens/resolve` 回来补标题；服务端不声明 `resolveProvider` 时就永远占位，最终回落到一个**假的**「0 references」文本（`crates/editor/src/code_lens.rs` 的 `EMPTY_LENS_FALLBACK_TITLE`）。也就是说"纯文本汇总行"在 Zed 里是陷阱 —— VSCode 侧好好的写法搬过来就变形了 | ✅ `bdl-lsp` 侧新增命令 `bdl.showInfo`（弹 `window/showMessage`），所有汇总/说明行改用它；加测试 `TestEveryLensHasCommand` 锁定"每条 lens 都必须带 command、且命令必须在 `executeCommandProvider.commands` 里" |
 
 ---
 
@@ -561,9 +576,17 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > **Z-P3-1 ❌ 不采纳**（证据推翻：Zed 用 `didChangeConfiguration` 推设置，热更新本来就有）、
 > 文档热更新口径全面更正（"改完必须重启" → "通常不用重启"）。
 >
-> **只剩一项等实机**：§11.2 的 Zed 验收清单（Code Lens 渲染/点击 = Z-P2-1、项目符号 = #19、
+> **第八轮（2026-10-29 晚）**：**函数级反查 Code Lens 已实现**（`bdl-lsp@9ca180a`，源码 0.3.16，已推 origin/main）：
+> 函数定义那行挂「🔗 函数名 被 N 处调用」，点它跳到第一处调用；口径与「查找引用」一致
+> （只算可达模组）。同时**修掉一个只有 Zed 才会暴露的坑**：Zed 只显示 `lens.command.title`，
+> 没有 command 的 lens 会回落到**假的**「0 references」→ 新增命令 `bdl.showInfo`，
+> 所有汇总/说明行改用它，并加测试 `TestEveryLensHasCommand` 锁定不变量。
+> **Z-P2-1 的两条关键不确定性已由 Zed 源码证实**：点击走 `workspace/executeCommand`（命令必须在
+> `executeCommandProvider.commands` 里声明过）；反向的 `window/showDocument` **Zed 支持且会真的打开文件**。
+>
+> **只剩一项等实机**：§11.2 的 Zed 验收清单（Code Lens 渲染/点击观感 = Z-P2-1、项目符号 = #19、
 > 设置热更新 = #15）。本地代偿已完成：capability 握手实测、lens 生成协议测试、
-> `bdl.openLink` 反向请求测试、release 产物 API 校验。
+> `bdl.openLink` 反向请求测试、release 产物 API 校验、**Zed 源码逐条核对**。
 >
 > 护栏现状：清单 **17** 项 · init-script **15** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 315 KB。
 
