@@ -330,7 +330,7 @@ cargo test                              # 单元测试（配置合并 / ext 剥�
 python3 tests/verify-init-script.py     # 初始化脚本产物 15 项（核心；task 齐全 / 字段白名单 / 无 ${…} / deploy.json / 迁移 helper / ext.build 覆盖）
                                       # 有 pwsh 时另加 10 项 PowerShell 实跑（额外项，不计入 15）
 python3 tests/verify-docs.py            # 文档契约 10 项（版本三处一致 / 命令与护栏数字对拍 / 无过期引用）
-python3 tests/verify-release-workflow.py # 发布流水线 13 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器）
+python3 tests/verify-release-workflow.py # 发布流水线 16 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器 / wasm 独立 job）
 cargo build --release --target wasm32-wasip2
 ```
 
@@ -347,7 +347,7 @@ git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
 
 | 产物 | 说明 |
 |---|---|
-| `zed-bdl-<os>-<arch>.wasm` | 扩展本体（wasm32-wasip2） |
+| `zed-bdl.wasm` | 扩展本体（wasm32-wasip2，**平台无关**，只出一份） |
 | `bdl-lsp-<os>-<arch>.tar.gz` / `.zip` | 语言服务器 |
 | `tiptop-<os>-<arch>.tar.gz` / `.zip` | 采集/部署 CLI |
 | `SHA256SUMS` | 校验和 |

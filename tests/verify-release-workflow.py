@@ -158,6 +158,31 @@ def main() -> int:
     else:
         fail(f"wasm 产物名应为 {wasm_name}")
 
+    # 4b. wasm 必须在**独立的 job** 里编，不能放在四平台矩阵里。
+    #     wasm32-wasip2 的产物与目标平台无关；放进矩阵会在 Windows 上
+    #     用 PowerShell 跑 bash 语法而失败（2026-10-30 实跑踩过：
+    #     release workflow 的 windows/amd64 job 挂在"构建扩展 wasm"）。
+    if yaml is not None:
+        jobs = data.get("jobs") or {}
+        wasm_job = jobs.get("wasm")
+        if wasm_job is None:
+            fail("缺少 wasm job（wasm32-wasip2 产物与平台无关，应单独编）")
+        else:
+            ok("有独立的 wasm job")
+            build_jobs = jobs.get("build") or {}
+            build_steps = " ".join(s.get("name", "") for s in build_jobs.get("steps", []))
+            if "wasm" in build_steps.lower():
+                fail("build job 里还有 wasm 相关步骤（应只在独立的 wasm job 里编）")
+            else:
+                ok("四平台 job 里不再编 wasm（避免 Windows 的 shell 差异）")
+            # wasm job 必须用 bash（xxd/head 等是 bash 工具）
+            wasm_steps = wasm_job.get("steps") or []
+            shells = {s.get("shell", "bash") for s in wasm_steps if s.get("run")}
+            if shells == {"bash"}:
+                ok("wasm job 的脚本都用 bash")
+            else:
+                fail(f"wasm job 应全用 bash，实际 {shells}")
+
     # 5. 版本必须来自 tag，不能硬编码
     if "${{ needs.prepare.outputs.version }}" in text or "${VERSION}" in text:
         ok("版本号来自 tag（不硬编码）")

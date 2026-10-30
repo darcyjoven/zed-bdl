@@ -164,6 +164,59 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # ---------------------------------------------------------- 扩展 wasm（平台无关）
+  # 单独一个 job，不放在四平台矩阵里：
+  #   - wasm32-wasip2 的产物**与目标平台无关**（不是 Windows PE、不是 Mach-O），
+  #     在四个 runner 上各编一遍纯属浪费（还会在 Windows 上踩 shell 差异的坑）；
+  #   - 放 ubuntu 上编，shell 统一是 bash，`xxd`/`head` 都在。
+  #
+  # 扩展的 wasm 由 Zed 装扩展时自己编译（注册表装的是预构建产物，见
+  # crates/extension_cli）；这里出的是**发布物**：让 Release 自包含，
+  # 也方便排查"这个版本的扩展到底长什么样"。
+  wasm:
+    name: 扩展 wasm
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出扩展
+        uses: actions/checkout@v4
+        with:
+          path: zed-extension
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - name: 缓存 cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zed-extension/target
+          key: ${{ runner.os }}-release-cargo-${{ hashFiles('zed-extension/Cargo.lock') }}
+
+      - name: 构建 wasm
+        working-directory: zed-extension
+        shell: bash
+        run: |
+          set -eux
+          cargo build --release --target wasm32-wasip2
+          ls -lh target/wasm32-wasip2/release/*.wasm
+          # wasm 魔数：\0asm => 0061736d
+          magic=$(head -c 4 target/wasm32-wasip2/release/zed_bdl.wasm | xxd -p)
+          echo "magic=$magic"
+          test "$magic" = "0061736d"
+
+      - name: 上传 wasm
+        uses: actions/upload-artifact@v4
+        with:
+          name: zed-bdl-wasm
+          path: zed-extension/target/wasm32-wasip2/release/zed_bdl.wasm
+          if-no-files-found: error
+          retention-days: 7
+
   # ---------------------------------------------------------- 四平台构建/打包
   build:
     name: ${{ matrix.os }}/${{ matrix.arch }}
@@ -236,26 +289,6 @@ jobs:
           }
           $mingw | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           Write-Host "MinGW: $mingw"
-
-      # ---------------------------------------------------------------- 扩展本体
-      - name: 安装 Rust（扩展 wasm）
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-wasip2
-
-      # 扩展的 wasm 由 Zed 装扩展时（或 dev extension 编译时）自己编译，
-      # 这里出的是**发布物**：让 Release 自包含，也方便排查"这个版本的扩展
-      # 到底长什么样"。与 Zed 官方扩展一样用 release profile。
-      - name: 构建扩展 wasm
-        working-directory: zed-extension
-        run: |
-          set -eux
-          cargo build --release --target wasm32-wasip2
-          ls -lh target/wasm32-wasip2/release/*.wasm
-          # wasm 魔数：\0asm => 0061736d
-          magic=$(head -c 4 target/wasm32-wasip2/release/zed_bdl.wasm | xxd -p)
-          echo "magic=$magic"
-          test "$magic" = "0061736d"
 
       # ---------------------------------------------------------------- bdl-lsp
       - name: 构建 bdl-lsp
@@ -385,35 +418,34 @@ jobs:
           Compress-Archive -Path tiptop.exe -DestinationPath tiptop-windows-amd64.zip -Force
           Get-ChildItem
 
-      # 扩展 wasm 也进平台包（每个平台一份，内容相同；Zed 装扩展时用的是
-      # 注册表 CI 编的那份，这里这份是"自包含发布物"）。
-      - name: 收集扩展 wasm
-        shell: bash
-        run: |
-          set -eux
-          cp zed-extension/target/wasm32-wasip2/release/zed_bdl.wasm "dist/zed-bdl-${{ matrix.os }}-${{ matrix.arch }}.wasm"
-          ls -lh dist
-
       # BUILD-INFO.json：记下"这个扩展版本该配哪个后端版本"。
       # 扩展的 /bdl-env-check 可以读它来提示版本不匹配。
+      #
+      # 注意用 `$(cat <<EOF ... EOF)` 而不是 `cat > f <<EOF`：
+      # 后者在 YAML 块里的缩进会被原样写进文件（JSON 仍合法但多了空格），
+      # 而且 EOF 必须顶格、缩进一变就"unexpected EOF"。
+      # 用命令替换 + printf，缩进与内容彻底分开。
       - name: 写 BUILD-INFO.json
         shell: bash
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -eux
-          cd bdl-lsp && LSP_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' main.go)" && cd ..
-          cd tiptop && TOOLS_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' main.go)" && cd ..
-          cat > dist/BUILD-INFO.json <<EOF
-          {
-            "target": "${{ matrix.os }}-${{ matrix.arch }}",
-            "extensionVersion": "${{ needs.prepare.outputs.version }}",
-            "lspVersion": "${LSP_VERSION}",
-            "tiptopVersion": "${TOOLS_VERSION}",
-            "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          }
-          EOF
+          LSP_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' bdl-lsp/main.go)"
+          TOOLS_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' tiptop/main.go)"
+          test -n "$LSP_VERSION"
+          test -n "$TOOLS_VERSION"
+          BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf '{\n' > dist/BUILD-INFO.json
+          printf '  "target": "%s-%s",\n' '${{ matrix.os }}' '${{ matrix.arch }}' >> dist/BUILD-INFO.json
+          printf '  "extensionVersion": "%s",\n' "$VERSION" >> dist/BUILD-INFO.json
+          printf '  "lspVersion": "%s",\n' "$LSP_VERSION" >> dist/BUILD-INFO.json
+          printf '  "tiptopVersion": "%s",\n' "$TOOLS_VERSION" >> dist/BUILD-INFO.json
+          printf '  "builtAt": "%s"\n' "$BUILT_AT" >> dist/BUILD-INFO.json
+          printf '}\n' >> dist/BUILD-INFO.json
           cat dist/BUILD-INFO.json
+          # 必须是合法 JSON
+          python3 -c "import json;json.load(open('dist/BUILD-INFO.json'))"
 
       - name: 上传产物
         uses: actions/upload-artifact@v4
@@ -422,7 +454,6 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
-            dist/*.wasm
             dist/BUILD-INFO.json
           if-no-files-found: error
           retention-days: 7
@@ -430,7 +461,7 @@ jobs:
   # ------------------------------------------------------------- 发布 Release
   release:
     name: 发布 Release
-    needs: [prepare, build]
+    needs: [prepare, wasm, build]
     runs-on: ubuntu-24.04
     steps:
       - name: 下载全部产物
@@ -439,6 +470,19 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # wasm 是**平台无关**的（wasm32-wasip2），四平台各编一份没有意义；
+      # 单独的 wasm job 出这一份，平台名后缀也不加（它不是某个平台的产物）。
+      - name: 重命名 wasm 资产
+        shell: bash
+        working-directory: dist
+        run: |
+          set -eux
+          ls -l
+          for f in zed_bdl.wasm zed-bdl.wasm; do
+            if [ -f "$f" ]; then mv "$f" zed-bdl.wasm; break; fi
+          done
+          test -f zed-bdl.wasm
+
       # 四平台的 BUILD-INFO.json 内容相同（只有 target 不同），
       # 合并时只留一份，免得 Release 里出现四个同名文件。
       - name: 合并 BUILD-INFO.json
@@ -446,12 +490,12 @@ jobs:
         working-directory: dist
         run: |
           set -eux
-          ls -l
           if [ -f BUILD-INFO.json ]; then
             mv BUILD-INFO.json BUILD-INFO.json.keep
             rm -f BUILD-INFO.json.*
             mv BUILD-INFO.json.keep BUILD-INFO.json
           fi
+          ls -l
 
       - name: 生成 SHA256SUMS
         shell: bash
