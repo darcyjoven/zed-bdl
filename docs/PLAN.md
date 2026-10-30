@@ -3,7 +3,7 @@
 > **盘点日期**：2026-10-28（本次为**全量重写**，旧 PLAN 已删除）
 > **参照物**：VSCode 插件 `vscode-bdl` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏视图）
 > **后端基线**：`bdl-lsp` **v0.3.16**（四平台 Release，2026-10-29）· `tiptop` **v0.1.10**（四平台 Release，2026-10-29）
-> **本仓库基线**：`zed-bdl` **0.1.1**（目标 0.2.0 起分阶段推进）
+> **本仓库基线**：`zed-bdl` **0.3.0**（0.2.0 已落地全部 P0–P4 能力；0.3.0 起有 tag 即发布流水线）
 > **目的**：以 VSCode 侧**当前**已有进度为基准，把 Zed 侧推进到同等能力；平台做不到的部分**逐条给出已确认的降级方案**，不留"两边不一样"的模糊状态。
 >
 > **授权状态（用户 2026-10-28 已确认）**
@@ -50,7 +50,7 @@
 | `vscode-bdl`（4gl-full） | **0.9.2**，`bin/` 内置 `bdl-lsp` + `tiptop`，33 命令 / 50 设置键 / 2 视图 / 55 条 menus / 27 activationEvents / 0 keybindings | `vscode-extension/package.json:2,5,60,531-1019` |
 | `bdl-lsp` | **0.3.16**，tag `v0.3.16`（2026-10-29 发布：executeCommand / Code Lens / workspaceSymbolProvider + **函数级反查** + `bdl.showInfo`），`.github/workflows/release.yml` 出四平台产物 + `SHA256SUMS`；**Release 产物已实测**：SHA256 校验通过、`bdl-lsp version` = 0.3.16、握手实测 `codeLensProvider` / `workspaceSymbolProvider: true` / 7 条 executeCommand（含 `bdl.showInfo`）都在 | `bdl-lsp/main.go:35`、`release.yml` |
 | `tiptop` | **v0.1.10**（2026-10-29 首次发布）；新增 `release.yml`：tag `v*` → 四平台产物 + `SHA256SUMS` | `tiptop/main.go:40`、`.github/workflows/release.yml` |
-| `zed-bdl`（本仓库） | **0.2.0**（P0 已落地）；`src/` 拆为 `lib.rs` + `config.rs` + `binary.rs`；10 个 `.scm`；**17 项**清单校验 + 47 项 query 校验 + 3 个单元测试 | `extension.toml:4`、`Cargo.toml:3`、`tests/` |
+| `zed-bdl`（本仓库） | **0.3.0**（P0–P4 已落地 + 发布流水线）；`src/` 拆为 `lib.rs` + `config.rs` + `binary.rs` + `download.rs` + `project.rs` + `slash.rs` + `version.rs`；10 个 `.scm`；**17 项**清单校验 + 47 项 query 校验 + 13 项发布校验 + **17** 个单元测试 | `extension.toml:4`、`Cargo.toml:3`、`tests/` |
 | 本地已构建二进制 | `bdl-lsp 0.3.13`、`tiptop 0.1.8` —— **都过期**，`tiptop` 旧二进制缺 `download` / `-region` / `-login-profile` | 实跑 `artifacts/bin/* version` |
 
 ### 1.2 事实来源（本计划所有数字与结论的可核对出处）

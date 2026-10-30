@@ -5,7 +5,7 @@
 | 项目 | 值 |
 |---|---|
 | 扩展 id | **`4gl-full`**（仓库 `zed-bdl`；可与只有 grammar 的轻量扩展 `bdl` 共存） |
-| 本手册对应版本 | 扩展 **`0.2.0`**（阶段见 [PLAN §7](PLAN.md)） |
+| 本手册对应版本 | 扩展 **`0.3.0`**（阶段见 [PLAN §7](PLAN.md)） |
 | 语言服务器 | `bdl-lsp` **v0.3.16**（Linux / macOS(Intel,ARM) / Windows 四平台 GitHub Release + `SHA256SUMS`）；含 Code Lens / `executeCommand` / 项目符号 / **函数级反查** |
 | 采集 / 部署 CLI | `tiptop` **v0.1.10**（四平台 GitHub Release + `SHA256SUMS`；2026-10-29 首次发布） |
 | 参照物 | VSCode 插件 `4gl-full` **0.9.2**（33 条命令 / 50 个设置键 / 2 个侧边栏树视图） |
@@ -78,7 +78,7 @@
 Zed 命令面板（cmd-shift-p / ctrl-shift-p）→ 输入 zed: install dev extension → 选择本仓库目录
 ```
 
-加载成功后扩展面板里应出现 **`4gl-full`**（名称 `Genero BDL & Form (Full)`，版本 `0.2.0`）。
+加载成功后扩展面板里应出现 **`4gl-full`**（名称 `Genero BDL & Form (Full)`，版本 `0.3.0`）。
 
 > 📷 待补：扩展面板中显示 4gl-full 已加载（docs/images/zed/01-install-extension-panel.png）
 

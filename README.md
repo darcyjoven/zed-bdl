@@ -12,7 +12,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 > - 本仓库只放 Zed 交付物；构建缓存、日志、语料等过程产物在本地 `bdl-lsp/artifacts/`。
 > - v1 验证平台：**Linux + Windows**（macOS 后续补齐）。
 
-**版本**：扩展 `0.1.1` → 目标 `0.2.0`（追平中，阶段见 [PLAN §7](docs/PLAN.md)）。
+**版本**：扩展 `0.3.0`（阶段见 [PLAN §7](docs/PLAN.md)）。**打 `v*` tag 即发布** GitHub Release（含扩展 wasm + 两个后端二进制，见 §8.1）。
 后端：`bdl-lsp` **v0.3.16**（四平台 Release；含 executeCommand / Code Lens / workspaceSymbolProvider / 函数级反查）· `tiptop` **v0.1.10**（四平台 Release）。
 
 ---
@@ -340,7 +340,7 @@ CI（`.github/workflows/build.yml`）：wasm 构建 + 魔数校验 + 清单校�
 ### 8.1 发布（打 tag 即发布）
 
 ```bash
-git tag -a v0.2.0 -m "v0.2.0" && git push origin v0.2.0
+git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
 ```
 
 `v*` tag 推送后，`.github/workflows/release.yml` 自动构建并发布 GitHub Release：
