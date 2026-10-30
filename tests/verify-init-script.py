@@ -11,11 +11,22 @@
 检查项：
   1. `bash scripts/zed/init-workspace.sh <tmp>` 在空目录里能跑通（`</dev/null` 走默认值）；
   2. `.zed/{settings.json,tasks.json,bdl-tool.json}` 都是合法 JSON；
-  3. 20 条固定 task 的 label 齐全；任何 args 里不含 `${`；
+  3. 21 条固定 task 的 label 齐全；任何 args 里不含 `${`；
   4. 6 条 exec task 的 `-command` 用 Zed 变量（$ZED_RELATIVE_DIR / $ZED_STEM / $ZED_FILENAME）；
   5. `settings.json` 的 `link.mode` / `schema.mode` 是 `off`（轻量档），且不含密码类键；
   6. 再跑一次（settings.json 已存在）→ 原文件字节不变，另生成 `.zed/settings.json.bdl-new`；
-  7. 有 `pwsh` 时同样跑 PowerShell 版并断言前 3 项（没有就跳过，并打印说明）。
+  7. 填了生产环境 → 生成 `.project/deploy/deploy.json`，再跑一次同样不覆盖；
+  8. 迁移 helper 能搬旧资料目录，且**绝不覆盖**已存在的目标文件；
+  9. `ext.build.*` 覆盖生效（回读并映射成 Zed 变量，未配置的保持默认）；
+  10. 有 `pwsh` 时同样跑 PowerShell 版并断言同样的产物（没有就跳过，并打印说明）。
+
+★ **核心项数 vs 总项数**（重要）：
+   第 10 项只在装了 pwsh 的机器上跑（CI 的 runner 自带，本地不一定有），
+   所以**总项数会随环境变化**（CI 25 项 / 本地 15 项）。
+   文档里的护栏数字必须与**环境无关**，因此脚本把 pwsh 的那部分单独记为
+   "额外项"，输出里同时给出**核心项数**（恒定 15）——
+   `verify-docs.py` 对拍的就是这个核心项数。
+   （2026-10-29 踩过这个坑：CI 报"文档=15 实际=25"，根因是把总项数当契约。）
 
 用法：
   python3 tests/verify-init-script.py
@@ -60,10 +71,29 @@ EXPECTED_LABELS = [
 
 checks = 0
 failures = 0
+# extra_checks 只统计**依赖环境**的那部分（PowerShell 版实跑）。
+#
+# 为什么单独记：bash 版的检查项数是**固定**的，而 pwsh 版只在装了 pwsh 的机器上
+# 才跑（CI 的 ubuntu/windows runner 自带 pwsh；本地开发机不一定有）。
+# 早先把总项数直接写在文档里当契约，于是同一份代码在 CI 上是 25 项、本地是 15 项，
+# 文档里的数字两边都对不上 —— 这是**护栏设计缺陷**，不是文档写错。
+#
+# 现在改成：**核心项数（bash）恒定**，pwsh 的额外项单独报。
+#   - `verify-docs.py` 对拍的核心数字 = 核心项数（不含 pwsh 额外项）；
+#   - 本地没 pwsh 时与 CI 有 pwsh 时，这个数字**完全一致**，文档只需要维护一个数。
+extra_checks = 0
 
 
 def ok(msg: str) -> None:
     global checks
+    checks += 1
+    print(f"  \u2713 {msg}")
+
+
+def ok_extra(msg: str) -> None:
+    """环境相关的额外检查项（PowerShell 版实跑）；不计入核心项数。"""
+    global extra_checks, checks
+    extra_checks += 1
     checks += 1
     print(f"  \u2713 {msg}")
 
@@ -102,8 +132,9 @@ def run_generator(root: Path, shell: str, answers: str | None = None) -> str:
 PROD_ANSWERS = "\n" * 7 + "10.0.0.10\n22\nappuser\n1\n/u1/topprod\n.\nrsync\n\n"
 
 
-def check_deploy_json(root: Path, shell: str) -> None:
+def check_deploy_json(root: Path, shell: str, extra: bool = False) -> None:
     """有生产环境时，脚本应生成 tiptop 能读的 .project/deploy/deploy.json。"""
+    mark = ok_extra if extra else ok
     path = root / ".project/deploy/deploy.json"
     if not path.is_file():
         fail(f"[{shell}] 填了生产环境但没生成 .project/deploy/deploy.json")
@@ -127,7 +158,7 @@ def check_deploy_json(root: Path, shell: str) -> None:
     if problems:
         fail(f"[{shell}] deploy.json 字段不对：{problems}")
     else:
-        ok(f"[{shell}] 生成 .project/deploy/deploy.json（host/remoteRoot/upload.mode/compile.{{file}} 都对）")
+        mark(f"[{shell}] 生成 .project/deploy/deploy.json（host/remoteRoot/upload.mode/compile.{{file}} 都对）")
 
 
 def find_secret_keys(value, path=""):
@@ -145,7 +176,13 @@ def find_secret_keys(value, path=""):
     return hits
 
 
-def check_products(root: Path, shell: str) -> None:
+def check_products(root: Path, shell: str, extra: bool = False) -> None:
+    """断言生成产物。
+
+    extra=True 时（PowerShell 版）这些项算**环境相关的额外项**，
+    不计入核心项数 —— 否则文档里的护栏数字会随"本机有没有 pwsh"漂移。
+    """
+    mark = ok_extra if extra else ok
     zed = root / ".zed"
     try:
         settings = json.loads((zed / "settings.json").read_text(encoding="utf-8"))
@@ -154,14 +191,14 @@ def check_products(root: Path, shell: str) -> None:
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"[{shell}] 生成的三份 JSON 读不出/不合法：{exc}")
         return
-    ok(f"[{shell}] .zed/{{settings,tasks,bdl-tool}}.json 都是合法 JSON")
+    mark(f"[{shell}] .zed/{{settings,tasks,bdl-tool}}.json 都是合法 JSON")
 
     labels = [t.get("label") for t in tasks]
     missing = [x for x in EXPECTED_LABELS if x not in labels]
     if missing:
         fail(f"[{shell}] 缺少 task：{missing}")
     else:
-        ok(f"[{shell}] 21 条固定 task label 齐全")
+        mark(f"[{shell}] 21 条固定 task label 齐全")
 
     bad = [
         (t.get("label"), a)
@@ -173,7 +210,7 @@ def check_products(root: Path, shell: str) -> None:
         for label, arg in bad:
             fail(f"[{shell}] {label} 的 args 里含 Zed 解析不了的占位符：{arg!r}")
     else:
-        ok(f"[{shell}] 所有 args 都不含 `${{`（tiptop 模板占位符已改成 Zed 变量）")
+        mark(f"[{shell}] 所有 args 都不含 `${{`（tiptop 模板占位符已改成 Zed 变量）")
 
     execs = [t for t in tasks if t.get("args", [None])[0] == "exec"]
     if len(execs) != 6:
@@ -184,12 +221,12 @@ def check_products(root: Path, shell: str) -> None:
         if holder:
             fail(f"[{shell}] 这些 exec task 没用 Zed 变量：{holder}")
         else:
-            ok(f"[{shell}] 6 条 exec task 都用了 Zed 变量（$ZED_RELATIVE_DIR/$ZED_STEM/$ZED_FILENAME）")
+            mark(f"[{shell}] 6 条 exec task 都用了 Zed 变量（$ZED_RELATIVE_DIR/$ZED_STEM/$ZED_FILENAME）")
         no_region = [t["label"] for t in execs if "-region" not in t["args"]]
         if no_region:
             fail(f"[{shell}] 这些 exec task 缺 -region：{no_region}")
         else:
-            ok(f"[{shell}] 6 条 exec task 都带 -region")
+            mark(f"[{shell}] 6 条 exec task 都带 -region")
 
     # 字段白名单：Zed 的 task schema（docs/tasks.md）。生成脚本写错字段名时
     # Zed 不会报错，只会"这条 task 的行为不对"，必须静态拦下。
@@ -218,12 +255,12 @@ def check_products(root: Path, shell: str) -> None:
         for problem in field_problems:
             fail(f"[{shell}] task 字段不合法：{problem}")
     else:
-        ok(f"[{shell}] {len(tasks)} 条 task 的字段都在 Zed schema 白名单内（save/reveal/hide 取值也合法）")
+        mark(f"[{shell}] {len(tasks)} 条 task 的字段都在 Zed schema 白名单内（save/reveal/hide 取值也合法）")
 
     s = settings.get("lsp", {}).get("bdl-lsp", {}).get("settings", {})
     modes = (s.get("link", {}).get("mode"), s.get("schema", {}).get("mode"))
     if modes == ("off", "off"):
-        ok(f"[{shell}] 轻量档：link.mode / schema.mode = off")
+        mark(f"[{shell}] 轻量档：link.mode / schema.mode = off")
     else:
         fail(f"[{shell}] link/schema mode 应为 off/off，实际 {modes}")
 
@@ -231,7 +268,7 @@ def check_products(root: Path, shell: str) -> None:
     if hits:
         fail(f"[{shell}] 生成的文件里出现密码字段：{hits}")
     else:
-        ok(f"[{shell}] 不含密码字段（只写 secrets.json / BDL_ORA_PASSWORD 的指针）")
+        mark(f"[{shell}] 不含密码字段（只写 secrets.json / BDL_ORA_PASSWORD 的指针）")
 
 
 def main() -> int:
@@ -377,18 +414,25 @@ def main() -> int:
                 fail("PowerShell 版没有生成 .zed/tasks.json；输出见下")
                 print(out[-2000:])
             else:
-                ok("PowerShell 版在空目录里跑通")
-                check_products(root, "pwsh")
+                ok_extra("PowerShell 版在空目录里跑通")
+                check_products(root, "pwsh", extra=True)
         with tempfile.TemporaryDirectory(prefix="bdl-init-ps-prod-") as tmp:
             root = Path(tmp)
             run_generator(root, "pwsh", PROD_ANSWERS)
-            check_deploy_json(root, "pwsh")
+            check_deploy_json(root, "pwsh", extra=True)
     else:
         print("  \u26a0 未找到 pwsh：跳过 PowerShell 版实跑（CI 的 ubuntu/windows runner 上有 pwsh，会在 CI 覆盖）")
 
     print()
     if failures == 0:
         print(f"\u2713 {checks} 项校验全部通过")
+        if extra_checks:
+            print(
+                f"  （其中核心 {checks - extra_checks} 项 + PowerShell 额外 {extra_checks} 项；"
+                f"文档里的护栏数字对拍用**核心**项数）"
+            )
+        else:
+            print(f"  （核心 {checks} 项；本机没有 pwsh，PowerShell 版由 CI 覆盖）")
         return 0
     print(f"\u2717 {failures} 项校验失败")
     return 1

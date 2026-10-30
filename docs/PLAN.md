@@ -589,7 +589,12 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > 设置热更新 = #15）。本地代偿已完成：capability 握手实测、lens 生成协议测试、
 > `bdl.openLink` 反向请求测试、release 产物 API 校验、**Zed 源码逐条核对**。
 >
-> 护栏现状：清单 **17** 项 · init-script **15** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 315 KB。
+> 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **15** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 315 KB。
+>
+> > init-script 的「15 项」指**核心项数**（bash 版）。装了 pwsh 的机器（CI runner 自带）
+> > 还会额外跑 PowerShell 版 **10 项**，总项数变成 25 —— 那是**额外项**，不计入契约。
+> > 脚本输出里会分别标注「核心 N 项 + PowerShell 额外 M 项」，`verify-docs.py` 对拍的是核心项数。
+> > （2026-10-29 踩过：CI 报「文档=15 实际=25」，根因是把随环境变化的总项数当成了契约。）
 
 ```text
 【第一轮 · 只改本仓库，零外部依赖】

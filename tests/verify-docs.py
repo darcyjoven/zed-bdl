@@ -47,7 +47,16 @@ def read(path: str) -> str:
 
 
 def run_checker(script: str) -> int:
-    """跑另一个护栏脚本，返回它报告的项数（解析 `✓ N 项校验全部通过`）。"""
+    """跑另一个护栏脚本，返回它的**核心项数**。
+
+    注意：核心项数 ≠ 总项数。`verify-init-script.py` 的 PowerShell 版实跑只在
+    装了 pwsh 的机器上跑（CI 的 runner 自带，本地不一定有），所以它的总项数
+    会随环境变化（CI 25 项 / 本地 15 项）。
+
+    文档里的护栏数字必须与**环境无关**，否则同一份代码在 CI 和本地对不上
+    （2026-10-29 就踩过：CI 报"文档=15 实际=25"）。因此这里统一取脚本
+    输出的「核心 N 项」；没有这一行时回退到总项数（兼容旧脚本）。
+    """
     proc = subprocess.run(
         [sys.executable, str(ROOT / "tests" / script)],
         stdout=subprocess.PIPE,
@@ -55,6 +64,9 @@ def run_checker(script: str) -> int:
         text=True,
         cwd=str(ROOT),
     )
+    core = re.search(r"核心 (\d+) 项", proc.stdout)
+    if core:
+        return int(core.group(1))
     match = re.search(r"(\d+) 项校验全部通过", proc.stdout)
     if not match:
         raise RuntimeError(f"{script} 没输出项数（rc={proc.returncode}）：\n{proc.stdout[-800:]}")
@@ -119,9 +131,12 @@ def main() -> int:
     manifest_items = run_checker("verify-manifest.py")
     init_items = run_checker("verify-init-script.py")
 
-    line = next((l for l in plan.splitlines() if "护栏现状：" in l), None)
+    # 找 PLAN 里那一行「护栏现状…」的数字。
+    # 用正则而不是固定子串「护栏现状：」——那行后来加了「（**核心项数**，与环境无关）」
+    # 这样的说明文字，固定匹配会找不到（2026-10-29 踩过）。
+    line = next((l for l in plan.splitlines() if "护栏现状" in l and "清单" in l), None)
     if line is None:
-        fail("PLAN 里找不到『护栏现状：』那行")
+        fail("PLAN 里找不到『护栏现状…』那行")
     else:
         nums = dict(re.findall(r"(清单|init-script|query|cargo test)\D{0,4}\*{0,2}(\d+)\*{0,2}", line))
         want = {"清单": manifest_items, "init-script": init_items}
