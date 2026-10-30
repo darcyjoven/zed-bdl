@@ -209,11 +209,46 @@ jobs:
           echo "magic=$magic"
           test "$magic" = "0061736d"
 
-      - name: 上传 wasm
+      # BUILD-INFO.json：记下"这个扩展版本该配哪个后端版本"。
+      #
+      # ★ 它是**平台无关**的一份（放 wasm job 里出），不在四平台 job 里各出一份：
+      #   download-artifact 的 merge-multiple 会把同名文件**互相覆盖**，
+      #   四份 BUILD-INFO.json 只剩最后一份，"target" 字段也会只剩一个平台 —— 信息丢了。
+      #   而 target 本来就写在资产名里（bdl-lsp-linux-amd64.tar.gz），不重复记。
+      - name: 写 BUILD-INFO.json
+        shell: bash
+        working-directory: zed-extension
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BDL_LSP_REF: ${{ needs.prepare.outputs.bdl_lsp_ref }}
+          TIPTOP_REF: ${{ needs.prepare.outputs.tiptop_ref }}
+        run: |
+          set -eux
+          LSP_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' ../bdl-lsp/main.go)"
+          TOOLS_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' ../tiptop/main.go)"
+          test -n "$LSP_VERSION"
+          test -n "$TOOLS_VERSION"
+          BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          OUT=BUILD-INFO.json
+          printf '{\n' > "$OUT"
+          printf '  "extensionVersion": "%s",\n' "$VERSION" >> "$OUT"
+          printf '  "lspVersion": "%s",\n' "$LSP_VERSION" >> "$OUT"
+          printf '  "lspRef": "%s",\n' "$BDL_LSP_REF" >> "$OUT"
+          printf '  "tiptopVersion": "%s",\n' "$TOOLS_VERSION" >> "$OUT"
+          printf '  "tiptopRef": "%s",\n' "$TIPTOP_REF" >> "$OUT"
+          printf '  "builtAt": "%s"\n' "$BUILT_AT" >> "$OUT"
+          printf '}\n' >> "$OUT"
+          cat "$OUT"
+          # 必须是合法 JSON
+          python3 -c "import json;json.load(open('$OUT'))"
+
+      - name: 上传 wasm 与 BUILD-INFO.json
         uses: actions/upload-artifact@v4
         with:
           name: zed-bdl-wasm
-          path: zed-extension/target/wasm32-wasip2/release/zed_bdl.wasm
+          path: |
+            zed-extension/target/wasm32-wasip2/release/zed_bdl.wasm
+            zed-extension/BUILD-INFO.json
           if-no-files-found: error
           retention-days: 7
 
@@ -418,35 +453,6 @@ jobs:
           Compress-Archive -Path tiptop.exe -DestinationPath tiptop-windows-amd64.zip -Force
           Get-ChildItem
 
-      # BUILD-INFO.json：记下"这个扩展版本该配哪个后端版本"。
-      # 扩展的 /bdl-env-check 可以读它来提示版本不匹配。
-      #
-      # 注意用 `$(cat <<EOF ... EOF)` 而不是 `cat > f <<EOF`：
-      # 后者在 YAML 块里的缩进会被原样写进文件（JSON 仍合法但多了空格），
-      # 而且 EOF 必须顶格、缩进一变就"unexpected EOF"。
-      # 用命令替换 + printf，缩进与内容彻底分开。
-      - name: 写 BUILD-INFO.json
-        shell: bash
-        env:
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          set -eux
-          LSP_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' bdl-lsp/main.go)"
-          TOOLS_VERSION="$(sed -n 's/^var version = "\(.*\)"/\1/p' tiptop/main.go)"
-          test -n "$LSP_VERSION"
-          test -n "$TOOLS_VERSION"
-          BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{\n' > dist/BUILD-INFO.json
-          printf '  "target": "%s-%s",\n' '${{ matrix.os }}' '${{ matrix.arch }}' >> dist/BUILD-INFO.json
-          printf '  "extensionVersion": "%s",\n' "$VERSION" >> dist/BUILD-INFO.json
-          printf '  "lspVersion": "%s",\n' "$LSP_VERSION" >> dist/BUILD-INFO.json
-          printf '  "tiptopVersion": "%s",\n' "$TOOLS_VERSION" >> dist/BUILD-INFO.json
-          printf '  "builtAt": "%s"\n' "$BUILT_AT" >> dist/BUILD-INFO.json
-          printf '}\n' >> dist/BUILD-INFO.json
-          cat dist/BUILD-INFO.json
-          # 必须是合法 JSON
-          python3 -c "import json;json.load(open('dist/BUILD-INFO.json'))"
-
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
@@ -454,7 +460,6 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
-            dist/BUILD-INFO.json
           if-no-files-found: error
           retention-days: 7
 
@@ -470,31 +475,42 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # wasm 是**平台无关**的（wasm32-wasip2），四平台各编一份没有意义；
-      # 单独的 wasm job 出这一份，平台名后缀也不加（它不是某个平台的产物）。
-      - name: 重命名 wasm 资产
+      # merge-multiple: true 会把所有 artifact 的内容**平铺**到 dist/ 下
+      # （同名文件互相覆盖；现在 BUILD-INFO.json 只有一份，不存在覆盖）。
+      # wasm 的产物名是 zed_bdl.wasm（cargo 的包名规范化），对外统一叫
+      # zed-bdl.wasm。
+      - name: 整理产物
         shell: bash
         working-directory: dist
         run: |
           set -eux
           ls -l
-          for f in zed_bdl.wasm zed-bdl.wasm; do
-            if [ -f "$f" ]; then mv "$f" zed-bdl.wasm; break; fi
-          done
-          test -f zed-bdl.wasm
-
-      # 四平台的 BUILD-INFO.json 内容相同（只有 target 不同），
-      # 合并时只留一份，免得 Release 里出现四个同名文件。
-      - name: 合并 BUILD-INFO.json
-        shell: bash
-        working-directory: dist
-        run: |
-          set -eux
-          if [ -f BUILD-INFO.json ]; then
-            mv BUILD-INFO.json BUILD-INFO.json.keep
-            rm -f BUILD-INFO.json.*
-            mv BUILD-INFO.json.keep BUILD-INFO.json
+          # cargo 的包名 zed-bdl 会把产物叫 zed_bdl.wasm；对外统一叫 zed-bdl.wasm。
+          # 注意别 mv 到自己（重跑时已经是目标名了，mv 会报 "same file"）。
+          if [ -f zed_bdl.wasm ] && [ ! -f zed-bdl.wasm ]; then
+            mv zed_bdl.wasm zed-bdl.wasm
           fi
+          # 四个平台的两个后端二进制必须都在（少一个就红，别让 Release 静默缺件）
+          missing=""
+          for os in linux darwin windows; do
+            for arch in amd64 arm64; do
+              case "$os-$arch" in
+                linux-arm64|windows-arm64) continue ;;  # 这两个组合没有产物
+              esac
+              ext=tar.gz; [ "$os" = "windows" ] && ext=zip
+              for name in "bdl-lsp-$os-$arch.$ext" "tiptop-$os-$arch.$ext"; do
+                [ -f "$name" ] || missing="$missing $name"
+              done
+            done
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::缺少发布产物：$missing"
+            exit 1
+          fi
+          test -f zed-bdl.wasm
+          test -f BUILD-INFO.json
+          # BUILD-INFO.json 必须合法
+          python3 -c "import json;json.load(open('BUILD-INFO.json'))"
           ls -l
 
       - name: 生成 SHA256SUMS

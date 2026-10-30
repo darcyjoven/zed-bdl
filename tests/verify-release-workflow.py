@@ -183,6 +183,34 @@ def main() -> int:
             else:
                 fail(f"wasm job 应全用 bash，实际 {shells}")
 
+    # 4c. BUILD-INFO.json 只能有**一份**（放 wasm job 里）。
+    #     download-artifact 的 merge-multiple 会让同名文件互相覆盖：
+    #     四个平台各出一份 → 只剩最后一份，"target" 字段还会只剩一个平台。
+    if yaml is not None:
+        jobs = data.get("jobs") or {}
+        wasm_job = jobs.get("wasm") or {}
+        wasm_step_names = " ".join(s.get("name", "") for s in wasm_job.get("steps", []))
+        build_job = jobs.get("build") or {}
+        build_step_names = " ".join(s.get("name", "") for s in build_job.get("steps", []))
+        if "BUILD-INFO" in wasm_step_names:
+            ok("BUILD-INFO.json 在 wasm job 里出（平台无关，只一份）")
+        else:
+            fail("BUILD-INFO.json 应在 wasm job 里出（放四平台里会互相覆盖）")
+        if "BUILD-INFO" in build_step_names:
+            fail("build job 里还有 BUILD-INFO.json（会与 wasm job 的那份互相覆盖）")
+        else:
+            ok("四平台 job 里不再出 BUILD-INFO.json（避免同名覆盖）")
+
+    # 4d. 发布前必须校验"四个平台的产物都在"——少一个就红，
+    #     别让 Release 静默缺件（用户下到某个平台才发现没有二进制）。
+    if yaml is not None:
+        release_job = (data.get("jobs") or {}).get("release") or {}
+        release_text = " ".join(s.get("run", "") for s in release_job.get("steps", []))
+        if "缺少发布产物" in release_text:
+            ok("发布前校验四个平台产物齐全（缺件即红）")
+        else:
+            fail("发布前应校验产物齐全（缺件即红）")
+
     # 5. 版本必须来自 tag，不能硬编码
     if "${{ needs.prepare.outputs.version }}" in text or "${VERSION}" in text:
         ok("版本号来自 tag（不硬编码）")
