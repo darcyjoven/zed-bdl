@@ -263,13 +263,27 @@ jobs:
           # 必须是合法 JSON
           python3 -c "import json;json.load(open('$OUT'))"
 
+      # ★ 上传前先把产物**摊到同一个目录**，否则归档内的路径由
+      #   upload-artifact 的"最小公共祖先"（LCA）决定：
+      #   `zed-extension/target/.../zed_bdl.wasm` + `zed-extension/BUILD-INFO.json`
+      #   的 LCA 是 `zed-extension`，于是 wasm 会以
+      #   `target/wasm32-wasip2/release/zed_bdl.wasm` 的形态进归档，
+      #   下载下来后找不到（2026-10-30 实跑踩过：release job 挂在"整理产物"）。
+      #   显式 staging 之后，归档内就是 zed-bdl.wasm + BUILD-INFO.json 两个平铺文件。
+      - name: 整理上传内容
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p staging
+          cp zed-extension/target/wasm32-wasip2/release/zed_bdl.wasm staging/zed-bdl.wasm
+          cp zed-extension/BUILD-INFO.json staging/BUILD-INFO.json
+          ls -l staging
+
       - name: 上传 wasm 与 BUILD-INFO.json
         uses: actions/upload-artifact@v4
         with:
           name: zed-bdl-wasm
-          path: |
-            zed-extension/target/wasm32-wasip2/release/zed_bdl.wasm
-            zed-extension/BUILD-INFO.json
+          path: staging/
           if-no-files-found: error
           retention-days: 7
 
@@ -497,20 +511,14 @@ jobs:
           merge-multiple: true
 
       # merge-multiple: true 会把所有 artifact 的内容**平铺**到 dist/ 下
-      # （同名文件互相覆盖；现在 BUILD-INFO.json 只有一份，不存在覆盖）。
-      # wasm 的产物名是 zed_bdl.wasm（cargo 的包名规范化），对外统一叫
-      # zed-bdl.wasm。
+      # （同名文件互相覆盖；BUILD-INFO.json 只有一份，不存在覆盖）。
+      # 上传时都摊平了（见 wasm job 的"整理上传内容"），所以这里直接是平铺的。
       - name: 整理产物
         shell: bash
         working-directory: dist
         run: |
           set -eux
           ls -l
-          # cargo 的包名 zed-bdl 会把产物叫 zed_bdl.wasm；对外统一叫 zed-bdl.wasm。
-          # 注意别 mv 到自己（重跑时已经是目标名了，mv 会报 "same file"）。
-          if [ -f zed_bdl.wasm ] && [ ! -f zed-bdl.wasm ]; then
-            mv zed_bdl.wasm zed-bdl.wasm
-          fi
           # 四个平台的两个后端二进制必须都在（少一个就红，别让 Release 静默缺件）
           missing=""
           for os in linux darwin windows; do

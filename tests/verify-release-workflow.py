@@ -215,6 +215,14 @@ def main() -> int:
     #     2026-10-30 实跑踩过：wasm job 读 `../bdl-lsp/main.go` 写 BUILD-INFO.json，
     #     但那个 job 根本没 checkout bdl-lsp → 文件不存在 → job 红。
     #     这类错只在 CI 上暴露（本地没有 actions/checkout 的目录结构）。
+    #
+    # 4f. upload-artifact 的归档结构由**搜索路径的最小公共祖先（LCA）**决定。
+    #     多路径上传时，LCA 之外的目录会保留在归档里 —— 下载后找不到文件。
+    #     2026-10-30 实跑踩过：wasm artifact 传
+    #     `zed-extension/target/.../zed_bdl.wasm` + `zed-extension/BUILD-INFO.json`，
+    #     LCA 是 `zed-extension`，wasm 于是以 `target/wasm32-wasip2/release/…`
+    #     的形态进归档，release job 找不到它 → 红。
+    #     ⇒ 上传前必须先摊平到同一个目录（本次用 `staging/`）。
     if yaml is not None:
         problems: list[str] = []
         for jn, job in (data.get("jobs") or {}).items():
@@ -228,7 +236,16 @@ def main() -> int:
                 # 找出脚本里引用的 ../<dir>/… 与 <dir>/… 相对路径
                 for m in re.finditer(r"(?:\.\./)?([A-Za-z0-9_.-]+)/[A-Za-z0-9_.-]+\.(?:go|mod|toml|json)", run):
                     d = m.group(1)
-                    if d in ("target", "dist", "src", "scripts", "tests", "languages", "docs"):
+                    if d in (
+                        "target",
+                        "dist",
+                        "src",
+                        "scripts",
+                        "tests",
+                        "languages",
+                        "docs",
+                        "staging",  # job 内部的暂存目录（上传前摊平产物用）
+                    ):
                         continue  # 本仓库自己的目录
                     if d not in checked_out and d not in ("bdl-lsp", "tiptop", "zed-extension"):
                         problems.append(f"{jn}.{step.get('name','?')} 引用了 {d}/ 但该 job 没 checkout {d}")
@@ -247,6 +264,46 @@ def main() -> int:
                 fail(p)
         else:
             ok("每个 job 用到的外部仓库都 checkout 过")
+
+    # 4f. upload-artifact 的 LCA 检查：多路径上传时，归档内会保留 LCA 之外的目录。
+    #     要求每个 upload 步骤的路径都在**同一个目录**下（或只有一个路径）。
+    #
+    #     注意：**通配符**（`dist/*.tar.gz`）展开后仍在 LCA 之下，是平铺的；
+    #     只有**具体文件路径**（`a/b/c.wasm`）才会把 `b/` 带进归档。
+    #     所以这里只对"含通配符的路径"与"不同目录"报警。
+    if yaml is not None:
+        lca_problems: list[str] = []
+        for jn, job in (data.get("jobs") or {}).items():
+            for step in job.get("steps") or []:
+                if "upload-artifact" not in str(step.get("uses", "")):
+                    continue
+                raw = (step.get("with") or {}).get("path") or ""
+                paths = [p.strip().rstrip("/") for p in raw.splitlines() if p.strip()]
+                if not paths:
+                    continue
+                dirs = {p.rsplit("/", 1)[0] if "/" in p else "" for p in paths}
+                if len(dirs) > 1:
+                    lca_problems.append(
+                        f"{jn}.{step.get('name','?')} 的 upload 路径跨了多个目录 {sorted(dirs)}"
+                        f"（LCA 之外的目录会进归档，下载后找不到文件）"
+                    )
+                # 单路径且是具体文件（不含通配符）→ 它的父目录会成为 LCA，
+                # 归档里就是平铺的一个文件，**没有问题**；只有路径里还带子目录
+                # （如 a/b/c.wasm）才会保留层级。用通配符或目录路径最稳。
+                for p in paths:
+                    if "*" in p:
+                        continue
+                    depth = p.count("/")
+                    if depth >= 2:
+                        lca_problems.append(
+                            f"{jn}.{step.get('name','?')} 的 upload 路径 {p} 带 {depth} 层目录"
+                            f"（LCA 之外的层级会留在归档里）—— 请先摊平到同一目录"
+                        )
+        if lca_problems:
+            for p in lca_problems:
+                fail(p)
+        else:
+            ok("upload-artifact 的路径不会把子目录带进归档")
 
     # 5. 版本必须来自 tag，不能硬编码
     if "${{ needs.prepare.outputs.version }}" in text or "${VERSION}" in text:
