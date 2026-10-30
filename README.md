@@ -343,7 +343,9 @@ CI（`.github/workflows/build.yml`）：wasm 构建 + 魔数校验 + 清单校�
 git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
 ```
 
-`v*` tag 推送后，`.github/workflows/release.yml` 自动构建并发布 GitHub Release：
+`v*` tag 推送后，`.github/workflows/release.yml` 自动构建并发布 GitHub Release。
+**v0.3.0 已发布并实测**（SHA256 校验通过、`bdl-lsp version` = 0.3.16、`tiptop version` = 0.1.10、
+wasm 魔数正确）：
 
 | 产物 | 说明 |
 |---|---|

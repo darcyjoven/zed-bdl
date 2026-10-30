@@ -608,6 +608,14 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > 设置热更新 = #15）。本地代偿已完成：capability 握手实测、lens 生成协议测试、
 > `bdl.openLink` 反向请求测试、release 产物 API 校验、**Zed 源码逐条核对**。
 >
+> **第九轮（2026-10-30）**：**本扩展的发布流水线已落地并实跑成功**（Z-P4-6）：
+> `.github/workflows/release.yml` —— `v*` tag 推送即发布 GitHub Release，
+> 含扩展 wasm + `bdl-lsp`/`tiptop` 四平台二进制 + `SHA256SUMS` + `BUILD-INFO.json`；
+> 扩展的下载链改成「后端 Release → 本扩展 Release（兜底）」。
+> **v0.3.0 已发布**（11 个资产，SHA256/版本/wasm 魔数均实测通过）。
+> 实跑中连踩四个坑（Windows shell / BUILD-INFO 同名覆盖 / job 缺 checkout /
+> upload-artifact 的 LCA），每个都补了对应护栏（release 21 项）。
+>
 > 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **15** 项 · release **21** 项 · 文档 **10** 项 · query **47** 项 · `cargo test` **17** 项 · wasm 315 KB。
 >
 > > init-script 的「15 项」指**核心项数**（bash 版）。装了 pwsh 的机器（CI runner 自带）
