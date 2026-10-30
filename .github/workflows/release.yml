@@ -183,6 +183,27 @@ jobs:
         with:
           path: zed-extension
 
+      # BUILD-INFO.json 要记"本次发布实际用的后端版本"，
+      # 所以这个 job 也得把两个后端仓库拉下来（只读 main.go 里的版本号，
+      # 不编译 —— 编译在四平台的 build job 里做）。
+      #
+      # ⚠️ 兄弟目录名必须是 bdl-lsp / tiptop：tiptop 的 go.mod 里有
+      #    `replace github.com/darcyjoven/bdl-lsp => ../bdl-lsp`，
+      #    相对路径以模块根为基准，目录名错了就 replace 不到。
+      - name: 检出 bdl-lsp
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.BDL_LSP_REPO }}
+          ref: ${{ needs.prepare.outputs.bdl_lsp_ref }}
+          path: bdl-lsp
+
+      - name: 检出 tiptop
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TIPTOP_REPO }}
+          ref: ${{ needs.prepare.outputs.tiptop_ref }}
+          path: tiptop
+
       - name: 安装 Rust
         uses: dtolnay/rust-toolchain@stable
         with:

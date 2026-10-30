@@ -211,6 +211,43 @@ def main() -> int:
         else:
             fail("发布前应校验产物齐全（缺件即红）")
 
+    # 4e. 每个 job 用到的**相对路径**，必须在该 job 里 checkout 过。
+    #     2026-10-30 实跑踩过：wasm job 读 `../bdl-lsp/main.go` 写 BUILD-INFO.json，
+    #     但那个 job 根本没 checkout bdl-lsp → 文件不存在 → job 红。
+    #     这类错只在 CI 上暴露（本地没有 actions/checkout 的目录结构）。
+    if yaml is not None:
+        problems: list[str] = []
+        for jn, job in (data.get("jobs") or {}).items():
+            checked_out: set[str] = set()
+            for step in job.get("steps") or []:
+                with_ = step.get("with") or {}
+                # actions/checkout 的 path（缺省是仓库根）
+                if "checkout" in str(step.get("uses", "")):
+                    checked_out.add(with_.get("path", "").strip("/"))
+                run = step.get("run") or ""
+                # 找出脚本里引用的 ../<dir>/… 与 <dir>/… 相对路径
+                for m in re.finditer(r"(?:\.\./)?([A-Za-z0-9_.-]+)/[A-Za-z0-9_.-]+\.(?:go|mod|toml|json)", run):
+                    d = m.group(1)
+                    if d in ("target", "dist", "src", "scripts", "tests", "languages", "docs"):
+                        continue  # 本仓库自己的目录
+                    if d not in checked_out and d not in ("bdl-lsp", "tiptop", "zed-extension"):
+                        problems.append(f"{jn}.{step.get('name','?')} 引用了 {d}/ 但该 job 没 checkout {d}")
+                if d := re.search(r"needs\.prepare\.outputs\.(\w+)", ""):
+                    pass
+            # 单独检查：run 里出现 ../bdl-lsp/ 或 ../tiptop/ 时，该 job 必须 checkout 过
+            for step in job.get("steps") or []:
+                run = step.get("run") or ""
+                for repo in ("bdl-lsp", "tiptop"):
+                    if re.search(rf"\.\./{repo}/", run) and repo not in checked_out:
+                        problems.append(
+                            f"{jn}.{step.get('name','?')} 读了 ../{repo}/ 但该 job 没 checkout {repo}"
+                        )
+        if problems:
+            for p in problems:
+                fail(p)
+        else:
+            ok("每个 job 用到的外部仓库都 checkout 过")
+
     # 5. 版本必须来自 tag，不能硬编码
     if "${{ needs.prepare.outputs.version }}" in text or "${VERSION}" in text:
         ok("版本号来自 tag（不硬编码）")
