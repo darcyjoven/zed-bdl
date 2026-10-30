@@ -329,11 +329,36 @@ node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字�
 cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
 python3 tests/verify-init-script.py     # 初始化脚本产物 15 项（核心；task 齐全 / 字段白名单 / 无 ${…} / deploy.json / 迁移 helper / ext.build 覆盖）
                                       # 有 pwsh 时另加 10 项 PowerShell 实跑（额外项，不计入 15）
-python3 tests/verify-docs.py            # 文档契约 9 项（版本三处一致 / 命令与护栏数字对拍 / 无过期引用）
+python3 tests/verify-docs.py            # 文档契约 10 项（版本三处一致 / 命令与护栏数字对拍 / 无过期引用）
+python3 tests/verify-release-workflow.py # 发布流水线 13 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器）
 cargo build --release --target wasm32-wasip2
 ```
 
-CI（`.github/workflows/build.yml`）：wasm 构建 + 魔数校验 + 清单校验 + grammar rev 存在性 + query 校验。
+CI（`.github/workflows/build.yml`）：wasm 构建 + 魔数校验 + 清单校验 + 初始化脚本校验 +
+发布流水线校验 + grammar rev 存在性 + query 校验。
+
+### 8.1 发布（打 tag 即发布）
+
+```bash
+git tag -a v0.2.0 -m "v0.2.0" && git push origin v0.2.0
+```
+
+`v*` tag 推送后，`.github/workflows/release.yml` 自动构建并发布 GitHub Release：
+
+| 产物 | 说明 |
+|---|---|
+| `zed-bdl-<os>-<arch>.wasm` | 扩展本体（wasm32-wasip2） |
+| `bdl-lsp-<os>-<arch>.tar.gz` / `.zip` | 语言服务器 |
+| `tiptop-<os>-<arch>.tar.gz` / `.zip` | 采集/部署 CLI |
+| `SHA256SUMS` | 校验和 |
+| `BUILD-INFO.json` | 这个扩展版本该配的后端版本 |
+
+> **为什么扩展的 Release 里带后端二进制**：Zed 扩展**不能内置**平台二进制
+> （manifest 没有 bin 字段、打包只复制白名单、wasm 沙箱读不到安装目录，
+> 官方也明令 "Do not bundle a language server"）。所以扩展在运行时按平台下载
+> （`src/download.rs`），下载链是「后端自己的 Release → 本扩展的 Release（兜底）」。
+> 本扩展的 Release 把两个后端**配对**发布，保证版本对得上。
+
 
 ---
 

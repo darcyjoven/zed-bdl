@@ -130,6 +130,7 @@ def main() -> int:
     # 4. 护栏项数：PLAN「护栏现状」那一行 + README 开发小节
     manifest_items = run_checker("verify-manifest.py")
     init_items = run_checker("verify-init-script.py")
+    release_items = run_checker("verify-release-workflow.py")
 
     # 找 PLAN 里那一行「护栏现状…」的数字。
     # 用正则而不是固定子串「护栏现状：」——那行后来加了「（**核心项数**，与环境无关）」
@@ -138,17 +139,29 @@ def main() -> int:
     if line is None:
         fail("PLAN 里找不到『护栏现状…』那行")
     else:
-        nums = dict(re.findall(r"(清单|init-script|query|cargo test)\D{0,4}\*{0,2}(\d+)\*{0,2}", line))
-        want = {"清单": manifest_items, "init-script": init_items}
+        nums = dict(
+            re.findall(
+                r"(清单|init-script|release|query|cargo test)\D{0,4}\*{0,2}(\d+)\*{0,2}", line
+            )
+        )
+        want = {
+            "清单": manifest_items,
+            "init-script": init_items,
+            "release": release_items,
+        }
         problems = [f"{k} 文档={nums.get(k)} 实际={v}" for k, v in want.items() if str(nums.get(k)) != str(v)]
         if problems:
             fail(f"PLAN『护栏现状』数字不符：{problems}（行：{line.strip()}）")
         else:
-            ok(f"PLAN『护栏现状』与实跑一致（清单 {manifest_items} / init-script {init_items}）")
+            ok(
+                f"PLAN『护栏现状』与实跑一致"
+                f"（清单 {manifest_items} / init-script {init_items} / release {release_items}）"
+            )
 
     for pattern, actual, label in (
         (r"# 清单 (\d+) 项", manifest_items, "README 清单项数"),
         (r"# 初始化脚本产物 (\d+) 项", init_items, "README init-script 项数"),
+        (r"# 发布流水线 (\d+) 项", release_items, "README release 项数"),
     ):
         found = re.findall(pattern, readme)
         bad = [n for n in found if int(n) != actual]

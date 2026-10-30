@@ -185,6 +185,22 @@
 | 扩展主动发 LSP 自定义请求 | trait 无 `send_request`（所以 `bdl/linkTree` 等只能靠 `executeCommand` 或直接读文件） |
 | 扩展定义 task | 官方文档把"语言扩展"列为 task 来源之一，但 manifest **没有 task 字段**；该路径实为 `runnables.scm`（行内 ▶ + `tags` 绑定）与 DAP 的 task/build 模板，**不能注册任意命令** → 本方案用「生成项目 `.zed/tasks.json` + 文档模板」 |
 | 读取任意 Zed 设置分类 | 公开 API 只有 `LspSettings::for_worktree`（即 `lsp.<server>` 整块），其它分类读不到 → **扩展配置必须放在 `lsp.bdl-lsp.settings` 里** |
+| **在扩展里内置平台二进制** | ★ **做不到**（2026-10-29 查 Zed main 源码证实，三重限制）：① `ExtensionManifest` 没有 `bin`/`assets` 字段；② 打包只复制白名单（`extension.toml`/`extension.wasm`/`grammars`/`themes`/`languages`/`snippets`…），任意 `bin/` 会被丢掉；③ wasm 沙箱只 preopen 扩展自己的 work 目录，**读不到扩展安装目录**（`Worktree` 的 `read-text-file`/`which` 都是**工作区/PATH** 作用域）。官方发布要求也明写 "Do not bundle a language server with the extension" → **只能运行时 `download_file` 下载**（Zed 官方扩展 glsl/proto 就是这么做的） |
+
+### 4.2.1 ★ Zed 扩展的安装/发布模型（2026-10-29 查 Zed main 源码证实）
+
+| 路径 | 谁编译 wasm | 客户端要什么 |
+|---|---|---|
+| **注册表安装** | registry CI（`zed-industries/extensions`）用 `zed-extension` CLI 在**发布时** release 编译，打成 `archive.tar.gz` 传 blob store | 客户端只**下载**预构建 wasm，**不编译** |
+| **dev extension** | 用户机器上 `cargo build --target wasm32-wasip2`（**无 `--locked`**；debug 模式），装成 symlink 指向源码目录 | 需要 rustup + `wasm32-wasip2`；带 grammar 还需要 wasi-sdk（Zed 自动下载，或 `WASI_SDK_PATH`） |
+
+- grammar 由 Zed 本地用 wasi-sdk 的 clang 编译 `parser.c`（**不需要 tree-sitter CLI**）；
+  grammar 仓库是 git 拉取后按 `rev` checkout 的。
+- ⇒ 本仓库提交 `Cargo.lock` 是有用的（cargo 用它作解析种子），但 Zed **不强制**它
+  （没有 `--locked`）；dev 安装时 cargo 甚至可能改写工作区里的 `Cargo.lock`。
+- ⇒ 本扩展的 GitHub Release **不能替代**安装；它的价值是**分发两个后端二进制**
+  （扩展运行时下载），见 Z-P4-6。
+
 
 ### 4.3 task 的可用能力（替代按钮/命令/进度的主力）
 
@@ -424,6 +440,7 @@ cargo build --release --target wasm32-wasip2
 | **Z-P4-3** ✅ | 下载状态显示：`set_language_server_installation_status`（`CheckingForUpdate` / `Downloading` / `Failed(msg)`） | `src/download.rs` | 失败时用户能看到原因而不是"服务器起不来" | Z-P4-1 |
 | **Z-P4-4** ✅ | 版本兼容提示：`/bdl-env-check` 解析两个二进制的 `version` 输出，低于最低要求（`bdl-lsp ≥ 0.3.13`、`tiptop ≥ 0.1.10`）时提醒升级（**不硬拦**，解析不出就不打扰） | `src/slash.rs` | 2 个单测覆盖（版本解析四种写法 / 只在低于最低值时提醒） | Z-P1-4 ✅ |
 | **Z-P4-5**（可选） | `runnables.scm`：把 `MAIN`/`FUNCTION` 标为可运行，标签绑定到编译/链接 task（Zed 的"行内 ▶"替代编辑器按钮） | `languages/bdl/runnables.scm`、文档 | 只在真实可用后再写；需要 `tags` 与 task 对齐 | Z-P1-2 |
+| **Z-P4-6** ✅ | **本扩展自己的发布流水线**（tag → 四平台 → GitHub Release） | `.github/workflows/release.yml`、`src/download.rs` | ①`v*` tag 推送即发布；②Release 含扩展 wasm + `bdl-lsp`/`tiptop` 四平台二进制 + `SHA256SUMS` + `BUILD-INFO.json`；③扩展的下载链改成「后端 Release → 本扩展 Release（兜底）」；④新增护栏 `verify-release-workflow.py`（13 项）对拍资产名 | ✅ 已落地（护栏 13 项全绿） |
 
 ### P5 · 实机验收与发布
 
@@ -431,6 +448,7 @@ cargo build --release --target wasm32-wasip2
 |---|---|---|
 | **Z-P5-1** | Zed 实机验收（Linux + Windows 必做；macOS 后续） | 按 §11.2 逐条勾选，结论回写 USER-GUIDE |
 | **Z-P5-2** | 扩展注册表发布（zed.dev 扩展市场） | **未排期**（用户未要求）；发布前必须有 Release + 实机验收全绿 |
+
 
 ---
 
@@ -504,7 +522,8 @@ export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
 cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
 python3 tests/verify-init-script.py                     # 初始化脚本产物 15 项（R12 无 ${…}、task 齐全、字段白名单、deploy.json、迁移 helper、ext.build 覆盖）
-python3 tests/verify-docs.py                            # 文档契约 9 项（版本三处一致 / 命令条数与护栏数字对拍 / 无过期引用）
+python3 tests/verify-docs.py                            # 文档契约 10 项（版本三处一致 / 命令条数与护栏数字对拍 / 无过期引用）
+python3 tests/verify-release-workflow.py                # 发布流水线 13 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
 cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-wasip2/release/zed_bdl.wasm
@@ -589,7 +608,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > 设置热更新 = #15）。本地代偿已完成：capability 握手实测、lens 生成协议测试、
 > `bdl.openLink` 反向请求测试、release 产物 API 校验、**Zed 源码逐条核对**。
 >
-> 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **15** 项 · 文档 **9** 项 · query **47** 项 · `cargo test` **15** 项 · wasm 315 KB。
+> 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **15** 项 · release **13** 项 · 文档 **10** 项 · query **47** 项 · `cargo test` **17** 项 · wasm 315 KB。
 >
 > > init-script 的「15 项」指**核心项数**（bash 版）。装了 pwsh 的机器（CI runner 自带）
 > > 还会额外跑 PowerShell 版 **10 项**，总项数变成 25 —— 那是**额外项**，不计入契约。

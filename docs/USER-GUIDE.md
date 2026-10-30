@@ -108,15 +108,38 @@ Zed 命令面板（cmd-shift-p / ctrl-shift-p）→ 输入 zed: install dev exte
 
 `tiptop` 同样有四个平台产物（`tiptop-<os>-<arch>.tar.gz|.zip`，含 `SHA256SUMS`）。
 
+- **下载是一条链**：先试后端自己的 Release（`darcyjoven/bdl-lsp` / `darcyjoven/tiptop`，
+  更新更快），**失败自动退到本扩展自己的 Release**（`darcyjoven/zed-bdl`）——
+  那里的两个后端是**配对**发布的，扩展版本与后端版本一定对得上。
+  两个来源都失败时，报错会把**每个**仓库的原因都列出来（只报最后一个错容易
+  让人误以为是网络问题）。
 - **本地已有二进制时永远优先**：只有「设置路径 → `BDL_LSP_PATH`/`TIPTOP_PATH` → 工作区 `.bdl-lsp/bin/` → `PATH`」全部落空才会下载。
-- 缓存：扩展工作目录下按版本分目录（如 `bdl-lsp-0.3.15/`）。**只要缓存里有可用的二进制就直接复用最新一份，
+- 缓存：扩展工作目录下按版本分目录（如 `bdl-lsp-0.3.16/`）。**只要缓存里有可用的二进制就直接复用最新一份，
   不会每次都去查 GitHub**（离线也能启动）；只有缓存为空时才联网下载，下载完顺手清掉更旧的目录。
 - 关闭：`lsp.bdl-lsp.settings.ext.download.bdlLsp = "off"` / `ext.download.tiptop = "off"`（键缺省即 `auto`）。
 - capability：需要 `download_file`（`extension.toml` 已声明 `host=github.com`、`path=["darcyjoven","**"]`）；
   若你在 `granted_extension_capabilities` 里收紧了权限，要放行同样形状，否则会提示 capability 错误。
 - macOS 首次运行未签名二进制可能需要 `xattr -d com.apple.quarantine <文件>`（见 bdl-lsp README）。
 
-> 📷 待补：首次打开时自动下载二进制的状态提示（docs/images/zed/02-auto-download-status.png）
+> 📷 待补：首次打开时自动下载二进制的状态提示（docs/images/zed/02-auto-download-status.png)
+
+> **扩展自己的 Release 也有这两个二进制**：`darcyjoven/zed-bdl` 的 Release 里同时带着
+> `bdl-lsp-<os>-<arch>.tar.gz` / `tiptop-<os>-<arch>.tar.gz`（同名资产，Windows 是 `.zip`）
+> 与 `SHA256SUMS`、`BUILD-INFO.json`。它是下载链的**兜底**来源，也是"扩展版本 ↔ 后端版本"
+> 的对应关系记录（`BUILD-INFO.json` 里写了本次发布实际用的后端版本）。
+>
+> ```bash
+> # 手工下载（不想让扩展自动下时）
+> curl -fsSL -O https://github.com/darcyjoven/zed-bdl/releases/latest/download/bdl-lsp-linux-amd64.tar.gz
+> curl -fsSL -O https://github.com/darcyjoven/zed-bdl/releases/latest/download/SHA256SUMS
+> grep 'bdl-lsp-linux-amd64' SHA256SUMS | sha256sum -c -
+> tar xzf bdl-lsp-linux-amd64.tar.gz && mkdir -p ~/.bdl-lsp/bin && mv bdl-lsp ~/.bdl-lsp/bin/
+> ```
+>
+> > Zed 扩展**不能内置**平台二进制（manifest 没有 bin 字段、打包只复制白名单、
+> > wasm 沙箱读不到安装目录，官方也明令 "Do not bundle a language server"），
+> > 所以"装扩展即带二进制"在 Zed 上做不到 —— 运行时下载是官方推荐的路子
+> > （Zed 自己的 glsl / proto 扩展就这么做）。
 
 **② 手工构建【✅ 当前可行】**
 

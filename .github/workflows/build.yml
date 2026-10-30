@@ -89,6 +89,12 @@ jobs:
         working-directory: zed-extension
         run: python3 tests/verify-init-script.py
 
+      - name: 校验发布流水线与扩展实现一致
+        # 发布产物里的资产名必须和扩展运行时解析的名字完全一致：
+        # 对不上时不会编译失败、不会 CI 变红，只在用户装扩展时炸。
+        working-directory: zed-extension
+        run: python3 tests/verify-release-workflow.py
+
       - name: 校验 grammar rev 真实存在
         # extension.toml 里的 rev 必须能在 grammar 仓库里找到，
         # 否则用户安装扩展时 Zed 拉不到 grammar，安装直接失败。
