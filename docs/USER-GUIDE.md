@@ -228,11 +228,21 @@ tiptop version
     }
   },
   "languages": {
-    "Genero BDL": { "semantic_tokens": "combined", "code_lens": "on" },
+    "Genero BDL": { "semantic_tokens": "combined" },
     "Genero Form": { "semantic_tokens": "combined" }
+  },
+  "editor": {
+    "code_lens": "on"
   }
 }
 ```
+
+> ⚠️ **`code_lens` 是全局的 `editor.` 键，不是语言级的**（2026-10-30 查 Zed 源码证实）：
+> Zed 的 `EditorSettings.code_lens`（`crates/settings_content/src/editor.rs:239`，
+> 取值 `off` / `on` / `menu`，默认 `off`）控制**所有**语言服务器的 Code Lens；
+> `LanguageSettingsContent`（`crates/settings_content/src/language.rs`）里**没有**
+> `code_lens` 字段 —— 写 `languages."Genero BDL".code_lens` **不生效**。
+> 而 `semantic_tokens` **是**语言级的（`language.rs:666`），要按语言名写。
 
 > 📷 待补：`.zed/settings.json` 里配置 bdl-lsp 的完整样子（docs/images/zed/04-settings-json.png）
 
@@ -269,7 +279,8 @@ initialization_options（逃生口，最高优先级）
 ```
 
 **语言名必须与 `extension.toml` 完全一致**：`"Genero BDL"` 与 `"Genero Form"`；
-写成 `"4gl"` 会让该语言下的 `semantic_tokens` / `code_lens` 不生效。
+写成 `"4gl"` 会让该语言下的 `semantic_tokens` 不生效（`code_lens` 是全局的
+`editor.` 键，不在语言这一层）。
 
 ### 1.4 第一次打开项目 [✅ 当前可用]
 
@@ -435,7 +446,7 @@ tiptop link sync -root . -source command -command "<输出 CSV 的命令>"     #
 
 **Code Lens 已由 `bdl-lsp` 实现**（`textDocument/codeLens`，2026-10-29）：把**链内子文件**各做一条 Code Lens 挂在 **MAIN 程序块**那一行（数据来自链接资料内存树），标题是 `模组/代码`，**上限 `link.lensMax`（默认 10）**，超出时最后一条是**汇总**（标题形如 `…另有 2 个链内文件`，**点它会弹出提示**说明还剩多少）；文件不在磁盘上时也会显示标题（点它弹提示说明"资料里有、磁盘上没有"），不会让你以为功能坏了。
 
-怎么用：① 采集链接资料；② `link.mode` 不是 `off`；③ 在 `languages."Genero BDL"` 下开 `"code_lens": "on"`（**默认 `off`**）。Code Lens 是**宿主的 LSP 客户端功能**，服务端实现即可渲染。
+怎么用：① 采集链接资料；② `link.mode` 不是 `off`；③ 在**全局** `editor.code_lens` 下开 `"on"`（**默认 `off`**，是全局键不是语言级键）。Code Lens 是**宿主的 LSP 客户端功能**，服务端实现即可渲染。
 
 > **点击链路已由 Zed 源码证实**（2026-10-29 核对 zed-industries/zed main 分支）：点击 lens 的标题会触发
 > `workspace/executeCommand`（命令 `bdl.openLink`），服务端再反向发 `window/showDocument`，
@@ -964,7 +975,7 @@ tiptop deploy -no-upload  -target prod                # 只编译
 | `lsp.bdl-lsp.binary.env` | object | `{}` | 启动语言服务器的附加环境变量 |
 | `lsp.bdl-lsp.initialization_options` | object | 无 | **逃生口**：启动时下发的配置（优先级最高） |
 | `languages."Genero BDL".semantic_tokens` | string | `"off"` | 语义高亮开关（`combined` 打开，见 §6.4） |
-| `languages."Genero BDL".code_lens` | string | `"off"` | Code Lens 开关（**服务端已实现**；开 `"on"` 后 MAIN 头上出现链内子文件的 lens，见 §3.2） |
+| `editor.code_lens` | string | `"off"` | Code Lens 开关（**全局键，不是语言级的**；取值 `off`/`on`/`menu`，开 `"on"` 后 MAIN 头上出现链内子文件的 lens，见 §3.2） |
 | `languages."Genero Form".semantic_tokens` | string | `"off"` | 同上（语言名必须写全） |
 
 ### 8.2 项目级配置 `.bdl-lsp/config.json` [✅ 当前可用（可提交）]

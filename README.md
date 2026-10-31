@@ -30,7 +30,7 @@ outline、括号匹配、缩进、SQL 注入，以及通过 [`bdl-lsp`](https://
 | 语义高亮 | `"semantic_tokens": "combined"` | ✅ `0.2.0`：扩展自带 `semantic_token_rules.json`（8 条规则，带主题回退） |
 | 设置生效与轻量档默认 | 自动 | ✅ `0.2.0`：有效配置从 `initializationOptions` 下发，且缺省补 `link/schema mode=off` |
 | 链接资料采集 / 导入 / 更新 | task → `tiptop link …` | ✅ 可用 |
-| 链接关系查看 | `/bdl-link-chain <代码>`（文本）/ Code Lens 挂在 **MAIN 函数头** | ✅ 文本版可查；✅ Code Lens **服务端已实现**（`bdl-lsp`，开 `"code_lens": "on"` 后可见；**点击链路已由 Zed 源码证实**：点击 → `workspace/executeCommand` → `window/showDocument` 打开目标文件） |
+| 链接关系查看 | `/bdl-link-chain <代码>`（文本）/ Code Lens 挂在 **MAIN 函数头** | ✅ 文本版可查；✅ Code Lens **服务端已实现**（`bdl-lsp`，开全局 `"editor": { "code_lens": "on" }` 后可见；**点击链路已由 Zed 源码证实**：点击 → `workspace/executeCommand` → `window/showDocument` 打开目标文件） |
 | 字段资料采集 / 同步 | task → `tiptop schema …` | ✅ 可用 |
 | 表 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ `0.2.0`：`/bdl-schema-tables`、`/bdl-schema-columns` |
 | 上传 / 下载 / 预演上传（单文件） | task → `tiptop upload` / `download` | ✅ 可用 |
