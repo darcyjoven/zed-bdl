@@ -616,7 +616,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > 实跑中连踩四个坑（Windows shell / BUILD-INFO 同名覆盖 / job 缺 checkout /
 > upload-artifact 的 LCA），每个都补了对应护栏（release 21 项）。
 >
-> 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **17** 项 · release **21** 项 · settings **5** 项 · 文档 **11** 项 · query **47** 项 · `cargo test` **17** 项 · wasm 315 KB。
+> 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **20** 项 · release **21** 项 · settings **5** 项 · 文档 **11** 项 · query **47** 项 · `cargo test` **17** 项 · wasm 315 KB。
 >
 > > init-script 的「15 项」指**核心项数**（bash 版）。装了 pwsh 的机器（CI runner 自带）
 > > 还会额外跑 PowerShell 版 **10 项**，总项数变成 25 —— 那是**额外项**，不计入契约。

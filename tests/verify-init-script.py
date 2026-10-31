@@ -452,6 +452,53 @@ def main() -> int:
                 else:
                     ok("[bash] 初始化项目 task 指向仓库自带的 init-project 脚本")
 
+    # 场景六：**从项目里的副本重跑**也必须能生成「初始化项目」task。
+    #   踩过的坑：脚本自己的"下一步"教用户 `cp -r scripts/zed/* .zed/bdl/`，
+    #   但那样**不会**带上 init-project；从项目里重跑时相对路径全落空，
+    #   默认值变空 → 静默不生成 task（用户只看到 `[留空]`，不知道为什么）。
+    #   现在脚本会把自己与 init-project 一起装进 .zed/bdl/。
+    with tempfile.TemporaryDirectory(prefix="bdl-init-self-") as tmp:
+        root = Path(tmp)
+        run_generator(root, "bash")           # 第一次：从仓库跑（会自装）
+        copied = root / ".zed" / "bdl" / "init-workspace.sh"
+        if not copied.is_file():
+            fail("[bash] 脚本没有把自己装进 .zed/bdl/（从项目里重跑会找不到 init-project）")
+        else:
+            ok("[bash] 脚本已自装到 .zed/bdl/init-workspace.sh")
+        init_dir = root / ".zed" / "bdl" / "init-project"
+        if not (init_dir / "init-project.sh").is_file():
+            fail("[bash] init-project 没有装进 .zed/bdl/init-project/")
+        else:
+            ok("[bash] init-project 已装进 .zed/bdl/init-project/")
+
+        if copied.is_file():
+            # 第二次：从项目里的副本跑
+            proc = subprocess.run(
+                ["bash", str(copied), str(root)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(root),
+                env={**os.environ, "ZED_WORKTREE_ROOT": str(root)},
+            )
+            tasks2 = root / ".zed" / "tasks.json"
+            if proc.returncode != 0:
+                fail(f"[bash] 从项目副本重跑失败（rc={proc.returncode}）：{proc.stdout[-400:]}")
+            elif not tasks2.is_file():
+                fail("[bash] 从项目副本重跑没有生成 tasks.json")
+            else:
+                t2 = json.loads(tasks2.read_text(encoding="utf-8"))
+                hit = [x for x in t2 if "初始化项目" in (x.get("label") or "")]
+                if not hit:
+                    fail("[bash] 从项目副本重跑后「初始化项目」task 消失了（相对路径没命中）")
+                else:
+                    p = Path(hit[0]["args"][-1])
+                    if not p.is_file():
+                        fail(f"[bash] 从项目副本重跑生成的 task 指向不存在的文件：{p}")
+                    else:
+                        ok("[bash] 从项目副本重跑仍能生成「初始化项目」task（指向真实文件）")
+
     if PS1.is_file() and shutil.which("pwsh"):
         with tempfile.TemporaryDirectory(prefix="bdl-init-ps-") as tmp:
             root = Path(tmp)

@@ -368,11 +368,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .zed\bdl\init-project\init-p
 
 ### 2.2 初始化后生成的 Zed 配置 [✅ 0.2.0 已落地（生成脚本已入库）]
 
-生成脚本已随仓库提供：**`scripts/zed/init-workspace.sh`**（bash 3.2+，Linux / macOS / WSL）与 **`scripts/zed/init-workspace.ps1`**（PowerShell 5.1+，Windows），两者行为等价：在终端里交互提问（4 组：二进制路径 → Oracle 连接 → 生产环境 → init-project 脚本路径），然后生成三件套。脚本自己**不在**生成的 tasks.json 里，想一键重跑要先把它拷进项目：
+生成脚本已随仓库提供：**`scripts/zed/init-workspace.sh`**（bash 3.2+，Linux / macOS / WSL）与 **`scripts/zed/init-workspace.ps1`**（PowerShell 5.1+，Windows），两者行为等价：在终端里交互提问（4 组：二进制路径 → Oracle 连接 → 生产环境 → init-project 脚本），然后生成三件套。
+
+**最简单：直接跑仓库里的**（脚本会把自己和 `init-project` **一起装进项目**）：
 
 ```bash
-mkdir -p .zed/bdl && cp -r <zed-bdl 仓库>/scripts/zed/* .zed/bdl/
-bash .zed/bdl/init-workspace.sh          # 交互提问；每项回车即用默认值
+bash <zed-bdl 仓库>/scripts/zed/init-workspace.sh      # 交互提问；每项回车即用默认值
+# Windows: pwsh -File <zed-bdl 仓库>\scripts\zed\init-workspace.ps1
+```
+
+跑完 `.zed/bdl/` 下会有 `init-workspace.{sh,ps1}`、`init-project/`、`migrate-data.*`，
+以后就能**在项目里重跑**（init-project 就在同级目录，直接找得到）：
+
+```bash
+bash .zed/bdl/init-workspace.sh          # 也可以做成 task 一键跑
 ```
 
 > Windows：仓库同时提供 **`scripts/zed/init-workspace.ps1`**（PowerShell 5.1+，行为与 bash 版等价）：

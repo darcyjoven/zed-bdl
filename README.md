@@ -215,10 +215,11 @@ Zed 扩展**无法注册命令到命令面板**，所以：
   然后把值内联进 `.zed/tasks.json`）：
 
 ```bash
-# 把脚本放进项目里（或直接指向本仓库路径）
-mkdir -p .zed/bdl && cp -r <zed-bdl 仓库>/scripts/zed/* .zed/bdl/
-bash .zed/bdl/init-workspace.sh          # Windows: pwsh -File .zed\bdl\init-workspace.ps1
+bash <zed-bdl 仓库>/scripts/zed/init-workspace.sh   # Windows: pwsh -File ...\init-workspace.ps1
 ```
+
+  脚本会把自己和 `init-project` **一起装进项目** `.zed/bdl/`，以后可以直接
+  `bash .zed/bdl/init-workspace.sh` 重跑。
 
   然后在 Zed 里 `task: spawn` → `4gl: 初始化 Zed 工程（生成 .zed 配置）` 也行。
   **脚本绝不写密码**：密码放 `<项目根>/.project/secrets.json`（Unix `chmod 600`）
@@ -327,7 +328,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字覆盖 / 真实语料编译）
 cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py     # 初始化脚本产物 17 项（核心；task 齐全 / 字段白名单 / 无 ${…} / deploy.json / 迁移 helper / ext.build 覆盖）
+python3 tests/verify-init-script.py     # 初始化脚本产物 20 项（核心；task 齐全 / 字段白名单 / 无 ${…} / deploy.json / 迁移 helper / ext.build 覆盖）
                                       # 有 pwsh 时另加 10 项 PowerShell 实跑（额外项，不计入 15）
 python3 tests/verify-docs.py            # 文档契约 11 项（版本三处一致 / 命令与护栏数字对拍 / 无过期引用）
 python3 tests/verify-release-workflow.py # 发布流水线 21 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器 / wasm 与 BUILD-INFO 独立 job）

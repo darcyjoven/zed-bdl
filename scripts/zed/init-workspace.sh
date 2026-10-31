@@ -311,10 +311,28 @@ section "4/4 init-project 脚本（回车 = 用仓库自带的；填路径 = 用
 # 这样拷进项目后 task 一定能找到（相对路径在 Zed 的 task 里按 cwd 解析，容易踩坑）。
 DEFAULT_INIT_SCRIPT=""
 SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for cand in "$SCRIPT_DIR_ABS/../init-project/init-project.sh" \
-            "$SCRIPT_DIR_ABS/../../scripts/init-project/init-project.sh"; do
+# 找仓库自带的 init-project。**必须覆盖两种常见布局**：
+#   A. 在仓库里跑：<repo>/scripts/zed/init-workspace.sh
+#        → init-project 在 <repo>/scripts/init-project/
+#   B. 脚本被拷进项目后跑（脚本自己的"下一步"就是这么教的）：
+#        <proj>/.zed/bdl/init-workspace.sh
+#        → 这时上面那些相对路径**全都落空**（踩过的坑：默认值变空 → 不生成 task，
+#          而用户看到的是"[留空]"，完全不知道为什么）
+# 所以按"离脚本最近"到"最远"依次找，并把**项目内已拷过的那份**也纳入候选。
+for cand in \
+    "$SCRIPT_DIR_ABS/init-project/init-project.sh" \
+    "$SCRIPT_DIR_ABS/../init-project/init-project.sh" \
+    "$SCRIPT_DIR_ABS/../../scripts/init-project/init-project.sh" \
+    "$ZED_DIR/bdl/init-project/init-project.sh" \
+    "$ROOT/scripts/init-project/init-project.sh" \
+    "$ROOT/.zed/bdl/init-project/init-project.sh"; do
     if [ -f "$cand" ]; then DEFAULT_INIT_SCRIPT="$cand"; break; fi
 done
+if [ -z "$DEFAULT_INIT_SCRIPT" ]; then
+    warn "找不到仓库自带的 init-project 脚本（找过这些位置都没命中）。"
+    warn "  * 回车会**跳过**「初始化项目」task；"
+    warn "  * 要用它请填脚本的绝对路径，例如 <zed-bdl 仓库>/scripts/init-project/init-project.sh。"
+fi
 ask "init-project 脚本路径（回车=用仓库自带；填 .sh/.ps1 路径=用你自己的；填 skip=不生成这条 task）" \
     "$DEFAULT_INIT_SCRIPT"
 INIT_SCRIPT="$ANS"
@@ -1009,6 +1027,21 @@ mkdir -p "$PROJECT_ROOT/.zed/bdl" || die "无法创建目录：$PROJECT_ROOT/.ze
 write_file "$PROJECT_ROOT/.zed/bdl/migrate-data.sh" "$MIGRATE_TMPL"
 chmod +x "$PROJECT_ROOT/.zed/bdl/migrate-data.sh" 2>/dev/null || true
 
+# 把**本脚本自己**也装进项目 .zed/bdl/ —— 这样以后可以直接在项目里重跑，
+# 而且那时 init-project 就在**同级目录**（.zed/bdl/init-project/），能直接找到。
+# 以前只装 migrate-data.sh，用户按提示手工拷 scripts/zed/* 进来，
+# 结果从项目里重跑时 init-project 搜不到（默认值变空 → 不生成「初始化项目」task）。
+SELF_SRC="${BASH_SOURCE[0]}"
+if [ -f "$SELF_SRC" ]; then
+    # 已经在 .zed/bdl/ 里跑就不用再拷（避免 cp 到自己）
+    SELF_DST="$PROJECT_ROOT/.zed/bdl/init-workspace.sh"
+    SELF_ABS="$(cd "$(dirname "$SELF_SRC")" && pwd)/$(basename "$SELF_SRC")"
+    if [ "$SELF_ABS" != "$SELF_DST" ]; then
+        cp "$SELF_SRC" "$SELF_DST" 2>/dev/null || true
+        chmod +x "$SELF_DST" 2>/dev/null || true
+    fi
+fi
+
 validate_json_file "$SETTINGS_JSON" || true
 if [ "$SETTINGS_REL" = ".zed/settings.json.bdl-new" ]; then
     validate_json_file "$SETTINGS_NEW" || true
@@ -1059,13 +1092,16 @@ cat <<'EOF'
    .zed/tasks.json 与 .zed/bdl-tool.json 不含密码，可以提交。
    .zed/bdl/ 下是脚本（init-project/、migrate-data.*、init-workspace.*），不含密码，也可以提交；
    想保持仓库干净就整个忽略 .zed/bdl/。
-7) 本脚本自己不在生成的 tasks.json 里。想以后在 Zed 里一键重跑，先把脚本放进项目：
-     mkdir -p .zed/bdl && cp -r <zed-bdl 仓库>/scripts/zed/* .zed/bdl/
-   然后手工加一条 task：
+7) 本脚本与 init-project 已**自动装进项目** .zed/bdl/，以后可以直接在 Zed 里重跑：
+     bash .zed/bdl/init-workspace.sh          # Linux / macOS / WSL
+     pwsh -File .zed\bdl\init-workspace.ps1   # Windows
+   想做成一条 task，手工加：
    { "label": "4gl: 初始化 Zed 工程（生成 .zed 配置）",
      "command": "bash", "args": [".zed/bdl/init-workspace.sh"],
      "cwd": "$ZED_WORKTREE_ROOT" }
    （Windows 用 "command": "pwsh", "args": ["-File", ".zed\\bdl\\init-workspace.ps1"]）
+   注：以前要手工 `cp -r scripts/zed/*`，但那样**不会**带上 init-project，
+   从项目里重跑时会找不到它（表现为「初始化项目」task 消失）—— 现在自带。
 8) 改 exec 的命令模板时**只用 Zed 变量**：$ZED_RELATIVE_DIR（当前文件目录）、
    $ZED_STEM（去扩展名）、$ZED_FILENAME（含扩展名）。
    不要写 ${path}/${name}/${fullname} —— 那是 VSCode 侧插件的模板占位符，

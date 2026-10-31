@@ -294,11 +294,25 @@ Write-Section '4/4 init-project 脚本（回车 = 用仓库自带的；填路径
 # （从生产服务器拉代码）。以前这里默认留空、让用户自己填路径，结果生成的 task
 # 指向一个**并不存在**的文件，点下去必然失败。
 $defaultInitScript = ''
+# 找仓库自带的 init-project。**必须覆盖两种常见布局**：
+#   A. 在仓库里跑：<repo>/scripts/zed/init-workspace.ps1
+#   B. 脚本被拷进项目后跑：<proj>/.zed/bdl/init-workspace.ps1
+#        （这时上面那些相对路径全都落空 —— 踩过的坑：默认值变空 → 不生成 task，
+#          而用户看到的是"[留空]"，完全不知道为什么）
 foreach ($cand in @(
+    (Join-Path $PSScriptRoot 'init-project/init-project.ps1'),
     (Join-Path $PSScriptRoot '../init-project/init-project.ps1'),
-    (Join-Path $PSScriptRoot '../../scripts/init-project/init-project.ps1')
+    (Join-Path $PSScriptRoot '../../scripts/init-project/init-project.ps1'),
+    (Join-Path (Join-Path $zedDir 'bdl') 'init-project/init-project.ps1'),
+    (Join-Path (Join-Path $root 'scripts') 'init-project/init-project.ps1'),
+    (Join-Path (Join-Path (Join-Path $root '.zed') 'bdl') 'init-project/init-project.ps1')
 )) {
     if (Test-Path -LiteralPath $cand) { $defaultInitScript = (Resolve-Path -LiteralPath $cand).Path; break }
+}
+if ([string]::IsNullOrEmpty($defaultInitScript)) {
+    Write-Warn '找不到仓库自带的 init-project 脚本（找过多个位置都没命中）。'
+    Write-Warn '  * 回车会**跳过**「初始化项目」task；'
+    Write-Warn '  * 要用它请填脚本的绝对路径，例如 <zed-bdl 仓库>/scripts/init-project/init-project.ps1。'
 }
 $initScript = Ask 'init-project 脚本路径（回车=用仓库自带；填 .sh/.ps1 路径=用你自己的；填 skip=不生成这条 task）' $defaultInitScript
 if ($initScript -eq 'skip' -or $initScript -eq 'none') { $initScript = '' }
@@ -943,6 +957,19 @@ if ($makeDeploy) {
 # 迁移 helper：放进项目的 .zed\bdl\，供 task「4gl: 迁移项目资料目录」调用
 $migratePath = Join-Path (Join-Path $zedDir 'bdl') 'migrate-data.ps1'
 Write-Utf8Bom $migratePath $migrateTmpl
+
+# 把**本脚本自己**也装进项目 .zed\bdl\ —— 这样以后可以直接在项目里重跑，
+# 而且那时 init-project 就在**同级目录**（.zed\bdl\init-project\），能直接找到。
+# 以前只装 migrate-data.ps1，用户按提示手工拷 scripts\zed\* 进来，
+# 结果从项目里重跑时 init-project 搜不到（默认值变空 → 不生成「初始化项目」task）。
+$selfDst = Join-Path (Join-Path $zedDir 'bdl') 'init-workspace.ps1'
+$selfAbs = $PSCommandPath
+if (-not [string]::IsNullOrEmpty($selfAbs) -and (Test-Path -LiteralPath $selfAbs)) {
+    $selfAbsFull = (Resolve-Path -LiteralPath $selfAbs).Path
+    if ($selfAbsFull -ne $selfDst) {
+        Copy-Item -Force -LiteralPath $selfAbs -Destination $selfDst -ErrorAction SilentlyContinue
+    }
+}
 
 $null = Assert-JsonFile $settingsJson
 if ($settingsRel -eq '.zed/settings.json.bdl-new') { $null = Assert-JsonFile $settingsNew }
