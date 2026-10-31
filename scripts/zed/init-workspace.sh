@@ -654,6 +654,15 @@ if [ -n "$INIT_SCRIPT" ]; then
         cp "$INIT_SCRIPT" "$PROJ_INIT_DIR/" 2>/dev/null || true
     fi
 
+    # ★ 必须显式传「本地目录」= $ZED_WORKTREE_ROOT（当前项目根）。
+    #   脚本自己的默认是 `$HOME/projects/<远根名>`（如 Windows 下
+    #   C:\Users\xxx\projects\topprod）—— 那是给"命令行随便跑"用的，
+    #   在 Zed 的 task 里会让人以为配错了（VSCode 侧的默认就是工作区根，见
+    #   vscode-extension/src/initproject.ts:142,214）。
+    #
+    #   还要带「增量更新」：目标 = 项目根**总是已存在**，不带 update 会在
+    #   confirm 之后被 `目标已存在` 挡下（init-project.sh:338）。
+    #   --update 只影响那个守卫与显示文案，不改变 rsync 的取数规则。
     if [ "$INIT_CMD" = "pwsh" ]; then
         # Windows：优先用 .ps1；没有就退回 .sh（bash 版在 Git Bash/WSL 下也能跑）
         FOUND_INIT="$(ls "$PROJ_INIT_DIR"/*.ps1 2>/dev/null | head -1)"
@@ -663,14 +672,15 @@ if [ -n "$INIT_SCRIPT" ]; then
         fi
         [ -n "$FOUND_INIT" ] || FOUND_INIT="$PROJ_INIT_DIR/init-project.ps1"
         if [ "$INIT_CMD" = "pwsh" ]; then
-            INIT_ARGS="[\"-File\", \"$(json_escape "$FOUND_INIT")\"]"
+            # $ZED_WORKTREE_ROOT 留给 Zed 展开（这里必须原样写）
+            INIT_ARGS="[\"-File\", \"$(json_escape "$FOUND_INIT")\", \"-Dest\", \"\$ZED_WORKTREE_ROOT\", \"-Update\"]"
         else
-            INIT_ARGS="[\"$(json_escape "$FOUND_INIT")\"]"
+            INIT_ARGS="[\"$(json_escape "$FOUND_INIT")\", \"--dest\", \"\$ZED_WORKTREE_ROOT\", \"--update\"]"
         fi
     else
         FOUND_INIT="$(ls "$PROJ_INIT_DIR"/*.sh 2>/dev/null | head -1)"
         [ -n "$FOUND_INIT" ] || FOUND_INIT="$PROJ_INIT_DIR/init-project.sh"
-        INIT_ARGS="[\"$(json_escape "$FOUND_INIT")\"]"
+        INIT_ARGS="[\"$(json_escape "$FOUND_INIT")\", \"--dest\", \"\$ZED_WORKTREE_ROOT\", \"--update\"]"
     fi
     chmod +x "$FOUND_INIT" 2>/dev/null || true
     INIT_SCRIPT_COPIED="$FOUND_INIT"

@@ -702,14 +702,23 @@ if (-not [string]::IsNullOrEmpty($initScript)) {
         Copy-Item -Force -Path (Join-Path $srcDir 'detect-encoding.py') -Destination $projInitDir -ErrorAction SilentlyContinue
     }
 
+    # ★ 必须显式传「本地目录」= $ZED_WORKTREE_ROOT（当前项目根）。
+    #   脚本自己的默认是 `$HOME\projects\<远根名>`（如 C:\Users\xxx\projects\topprod）——
+    #   那是给"命令行随便跑"用的，在 Zed 的 task 里会让人以为配错了
+    #   （VSCode 侧的默认就是工作区根，见 vscode-extension/src/initproject.ts:142,214）。
+    #
+    #   还要带「增量更新」：目标 = 项目根**总是已存在**，不带 -Update 会在 confirm
+    #   之后被 "目标已存在" 挡下（init-project.ps1:314-316）。
+    #   -Update 只影响那个守卫与显示文案，不改变取数规则。
     if ($initScript.EndsWith('.ps1', [System.StringComparison]::Ordinal)) {
         $initCmd = 'pwsh'
         $foundInit = Join-Path $projInitDir 'init-project.ps1'
-        $initArgs = '["-File", "' + (ConvertTo-JsonText $foundInit) + '"]'
+        # $ZED_WORKTREE_ROOT 留给 Zed 展开（这里必须原样写）
+        $initArgs = '["-File", "' + (ConvertTo-JsonText $foundInit) + '", "-Dest", "$ZED_WORKTREE_ROOT", "-Update"]'
     } else {
         $initCmd = 'bash'
         $foundInit = Join-Path $projInitDir 'init-project.sh'
-        $initArgs = '["' + (ConvertTo-JsonText $foundInit) + '"]'
+        $initArgs = '["' + (ConvertTo-JsonText $foundInit) + '", "--dest", "$ZED_WORKTREE_ROOT", "--update"]'
     }
     $initTailTmpl = @'
 ,

@@ -446,11 +446,41 @@ def main() -> int:
             if not init_tasks:
                 fail("[bash] 没有生成「4gl: 初始化项目」task")
             else:
-                script = Path(init_tasks[0]["args"][-1])
-                if not script.is_file():
-                    fail(f"[bash] 初始化项目 task 指向的脚本不存在：{script}")
+                # 脚本路径是 args 里那个 .sh/.ps1（不再是最后一个 —— 后面还跟着
+                # -Dest/--dest、-Update/--update 等参数）
+                script_arg = next(
+                    (a for a in init_tasks[0]["args"] if a.endswith((".sh", ".ps1"))),
+                    None,
+                )
+                if script_arg is None:
+                    fail(f"[bash] 初始化项目 task 里找不到脚本路径：{init_tasks[0]['args']}")
                 else:
-                    ok("[bash] 初始化项目 task 指向仓库自带的 init-project 脚本")
+                    script = Path(script_arg)
+                    if not script.is_file():
+                        fail(f"[bash] 初始化项目 task 指向的脚本不存在：{script}")
+                    else:
+                        ok("[bash] 初始化项目 task 指向仓库自带的 init-project 脚本")
+
+                # ★ 必须显式指定「本地目录」= 当前项目根。
+                #   脚本自己的默认是 $HOME/projects/<远根名>，在 Zed 的 task 里会
+                #   让人以为配错了（VSCode 侧默认就是工作区根）。
+                #   同时要带 update —— 项目根总是已存在，不带会被"目标已存在"挡下。
+                args = init_tasks[0]["args"]
+                joined = " ".join(args)
+                if "$ZED_WORKTREE_ROOT" not in args:
+                    fail(
+                        "[bash] 初始化项目 task 没有把本地目录传成 $ZED_WORKTREE_ROOT"
+                        f"（脚本会默认落到 $HOME/projects/<远根名>）：{args}"
+                    )
+                elif not any(a in ("-Dest", "--dest") for a in args):
+                    fail(f"[bash] 初始化项目 task 缺少 -Dest/--dest：{args}")
+                elif not any(a in ("-Update", "--update") for a in args):
+                    fail(
+                        f"[bash] 初始化项目 task 缺少 -Update/--update"
+                        f"（项目根已存在，会被「目标已存在」挡下）：{args}"
+                    )
+                else:
+                    ok("[bash] 初始化项目 task 指定了本地目录 = $ZED_WORKTREE_ROOT 且带 update")
 
     # 场景六：**从项目里的副本重跑**也必须能生成「初始化项目」task。
     #   踩过的坑：脚本自己的"下一步"教用户 `cp -r scripts/zed/* .zed/bdl/`，
@@ -493,9 +523,11 @@ def main() -> int:
                 if not hit:
                     fail("[bash] 从项目副本重跑后「初始化项目」task 消失了（相对路径没命中）")
                 else:
-                    p = Path(hit[0]["args"][-1])
-                    if not p.is_file():
-                        fail(f"[bash] 从项目副本重跑生成的 task 指向不存在的文件：{p}")
+                    sa = next(
+                        (a for a in hit[0]["args"] if a.endswith((".sh", ".ps1"))), None
+                    )
+                    if sa is None or not Path(sa).is_file():
+                        fail(f"[bash] 从项目副本重跑生成的 task 脚本不存在：{sa}")
                     else:
                         ok("[bash] 从项目副本重跑仍能生成「初始化项目」task（指向真实文件）")
 

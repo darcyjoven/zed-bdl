@@ -316,6 +316,12 @@ bdl-lsp check -q <文件...>                         # 只列有问题的文件
 `scripts/init-project/init-project.sh`（Linux/WSL）或 `init-project.ps1`（Windows）
 —— 与 VSCode 侧是**同一套**脚本，在 Zed 的**集成终端**里跑、可交互输入密码。
 
+> **本地目录**：生成的 task 会显式传 `--dest $ZED_WORKTREE_ROOT`（当前项目根）+
+> `--update`。脚本自己的默认是 `~/projects/<远根名>`（Windows 是
+> `C:\Users\<你>\projects\<远根名>`）—— 那是给命令行随便跑用的，
+> **在 Zed 的 task 里会让人以为配错了**，所以显式传。想拉到别处就手工跑脚本加 `--dest <目录>`。
+> （VSCode 侧的默认同样是工作区根，见 `vscode-extension/src/initproject.ts`。）
+>
 > **脚本从哪来**：初始化脚本（`scripts/zed/init-workspace.sh`）第 4 问会**默认**填上
 > 仓库自带的 `scripts/init-project/init-project.sh`，并把它**拷进项目**
 > `<项目根>/.zed/bdl/init-project/`（连同 `templates/`、`detect-encoding.py`），
