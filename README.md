@@ -331,7 +331,7 @@ python3 tests/verify-init-script.py     # 初始化脚本产物 15 项（核心�
                                       # 有 pwsh 时另加 10 项 PowerShell 实跑（额外项，不计入 15）
 python3 tests/verify-docs.py            # 文档契约 11 项（版本三处一致 / 命令与护栏数字对拍 / 无过期引用）
 python3 tests/verify-release-workflow.py # 发布流水线 21 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器 / wasm 与 BUILD-INFO 独立 job）
-python3 tests/verify-settings-json.py   # settings 示例 3 项（顶层键 / 语言级键 / bdl-lsp 键都对拍 Zed 的 schema）
+python3 tests/verify-settings-json.py   # settings 示例 5 项（顶层键 / 语言级键 / bdl-lsp 键都对拍 Zed 的 schema）
 cargo build --release --target wasm32-wasip2
 ```
 

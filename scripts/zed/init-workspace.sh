@@ -363,10 +363,19 @@ SETTINGS_TMPL=$(cat <<'JSON'
   "languages": {
     "Genero BDL": { "semantic_tokens": "combined" },
     "Genero Form": { "semantic_tokens": "combined" }
-  }
+  },
+  "code_lens": "on"
 }
 JSON
 )
+
+# ⚠️ `code_lens` 写在**顶层**，不是 "editor": { "code_lens": ... }，也不是
+#    languages.<语言名>.code_lens：
+#      · Zed 的 settings.json **没有 `editor` 这个键**（EditorSettingsContent 在
+#        SettingsContent 里是 `#[serde(flatten)]`，字段直接摊在顶层）——
+#        写成 "editor": {...} 会被 Zed 拒绝并报 "Property editor is not allowed."；
+#      · `semantic_tokens` 才是语言级的（languages.<语言名> 下面）。
+#    依据：zed-industries/zed main（2026-10-30）。护栏 tests/verify-settings-json.py 会拦。
 
 # shellcheck disable=SC2016
 TASKS_TMPL=$(cat <<'JSON'

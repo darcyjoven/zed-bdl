@@ -358,6 +358,42 @@ def main() -> int:
                 fail(f"USER-GUIDE.md:{lineno} 示例里有 \"editor\" 顶层键（Zed 会报 Property editor is not allowed）")
     ok("code_lens 用顶层键（不是 editor.code_lens）")
 
+    # 5. 初始化脚本生成的 settings.json 也要过同一套校验
+    #    （脚本模板里的键位错了，用户一跑就得到一份打不开的配置）。
+    import subprocess
+    import tempfile
+
+    sh = ROOT / "scripts" / "zed" / "init-workspace.sh"
+    if sh.is_file():
+        with tempfile.TemporaryDirectory(prefix="bdl-settings-") as tmp:
+            proc = subprocess.run(
+                ["bash", str(sh), tmp],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            gen = Path(tmp) / ".zed" / "settings.json"
+            if proc.returncode != 0 or not gen.is_file():
+                fail(f"初始化脚本没跑通（rc={proc.returncode}）")
+            else:
+                try:
+                    data = json.loads(strip_jsonc(gen.read_text(encoding="utf-8")))
+                except json.JSONDecodeError as exc:
+                    fail(f"初始化脚本生成的 settings.json 不合法：{exc}")
+                else:
+                    bad = sorted(k for k in data if k not in ZED_TOP_LEVEL_KEYS)
+                    if bad:
+                        fail(f"初始化脚本生成的 settings.json 顶层键不被 Zed 接受：{bad}")
+                    else:
+                        ok("初始化脚本生成的 settings.json 顶层键都被 Zed 接受")
+                    if "code_lens" in data:
+                        ok("初始化脚本生成的配置已带上顶层 code_lens")
+                    else:
+                        fail("初始化脚本生成的配置缺 code_lens（Code Lens 不会显示）")
+    else:
+        fail(f"缺少 {sh.relative_to(ROOT)}")
+
     print()
     if failures == 0:
         print(f"✓ {checks} 项校验全部通过")

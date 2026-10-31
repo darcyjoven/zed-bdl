@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 # =============================================================================
 # 4gl-full / zed-bdl —— Zed 工程初始化脚本（交互式，Windows / PowerShell 5.1+）
 #
@@ -350,7 +350,8 @@ $settingsTmpl = @'
   "languages": {
     "Genero BDL": { "semantic_tokens": "combined" },
     "Genero Form": { "semantic_tokens": "combined" }
-  }
+  },
+  "code_lens": "on"
 }
 '@
 
