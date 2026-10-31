@@ -51,7 +51,7 @@
 | 语义高亮（扩展自带 `semantic_token_rules.json`） | `"semantic_tokens": "combined"` | ✅ 0.2.0 已提供规则（**着色效果 ⚠️ 待实机核实**） | P0（Z-P0-4） |
 | `tiptop` 四级二进制定位 | 自动 | ✅ 0.2.0 已落地 | P0（Z-P0-5） |
 | 只读 slash command（9 条）+ task 生成脚本 + 扩展 `capabilities` 声明 | Agent 面板 `/bdl-…`；`scripts/zed/init-workspace.{sh,ps1}`；自动（首次弹授权） | ✅ 0.2.0 已落地 | P1（Z-P1-1 / Z-P1-2 / Z-P1-3） |
-| 项目初始化（拉代码，task 可挂载）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → 自备 `scripts/init-project/` 同款脚本；迁移用生成脚本产出的 `.zed/bdl/migrate-data.{sh,ps1}` | ✅ 0.2.0 已落地（两者都有 task） | P1（Z-P1-2）/ P2（Z-P2-2） |
+| 项目初始化（拉代码）+ 迁移旧资料目录（`.link/` → `.project/link/`） | task → **仓库自带的** `scripts/init-project/`（生成脚本拷进 `.zed/bdl/init-project/`）；迁移用 `.zed/bdl/migrate-data.{sh,ps1}` | ✅ 0.2.0 已落地（两者都有 task，脚本文件一定存在） | P1（Z-P1-2）/ P2（Z-P2-2） |
 | 表清单 / 列清单（无侧边栏树） | slash command 文本列表 | ✅ 0.2.0 已落地 | P1（Z-P1-1） |
 | 链接关系查看：Agent 面板文本清单 + 就地 Code Lens | slash `/bdl-link-chain` / Code Lens 挂在 **MAIN** 上 | ✅ 0.2.0 已落地（文本版）；✅ Code Lens 服务端已实现（`bdl-lsp` 0.3.15） | P2（Z-P2-2）→ P3（Z-P2-1 / Z-P3-3） |
 | 反查引用（**函数级**口径） | Code Lens「🔗 被 N 处调用」/ `executeCommand` | ✅ **已实现**（`bdl-lsp` 0.3.16）：函数定义那行显示调用数，点它跳到首处调用 | P3（Z-P3-3） |
@@ -306,26 +306,37 @@ bdl-lsp check -q <文件...>                         # 只列有问题的文件
 
 ---
 
-## 2. 项目初始化（从生产服务器拉取代码） [✅ 0.2.0 已落地（Zed 配置生成）/ 🔧 计划中·P1（拉代码 task 需自备脚本）]
+## 2. 项目初始化（从生产服务器拉取代码） [✅ 0.2.0 已落地（Zed 配置生成 + 拉代码 task，脚本已随仓库提供）]
 
 **目标**：把生产端（默认 `/u1/topprod`）下的 `*.4gl` / `*.per` / `*.global` 拉到本地，变成带 git 的工程。
 
-### 2.1 初始化脚本 [🔧 计划中·P1（当前可手工执行同款脚本）]
+### 2.1 初始化脚本 [✅ 0.2.0 已落地（脚本已随仓库提供）]
 
-计划的入口是 task `4gl: 初始化项目（从生产服务器拉取代码）`，调用与 VSCode 侧**同一套**脚本（`scripts/init-project/init-project.sh` 用于 Linux/WSL，`init-project.ps1` 用于 Windows），在**终端里跑**、可交互输入密码。**今天可用的做法**：拿到 `scripts/init-project/` 目录后直接跑。
+入口是 task `4gl: 初始化项目（从生产服务器拉取代码）`，调用**仓库自带**的
+`scripts/init-project/init-project.sh`（Linux/WSL）或 `init-project.ps1`（Windows）
+—— 与 VSCode 侧是**同一套**脚本，在 Zed 的**集成终端**里跑、可交互输入密码。
+
+> **脚本从哪来**：初始化脚本（`scripts/zed/init-workspace.sh`）第 4 问会**默认**填上
+> 仓库自带的 `scripts/init-project/init-project.sh`，并把它**拷进项目**
+> `<项目根>/.zed/bdl/init-project/`（连同 `templates/`、`detect-encoding.py`），
+> task 里写的是**项目内的绝对路径** → 点下去一定能找到文件。
+> 想用自己的脚本：在第 4 问填别的路径（会拷进项目），或填 `skip` 不生成这条 task。
+>
+> （早期版本让用户自己填路径，生成出来的 task 指向 `.ps1` 这种**并不存在**的文件，
+> 点下去必然失败 —— 已修。）
 
 ```bash
-# Linux / WSL：rsync 拉取，增量最快
-scripts/init-project/init-project.sh \
+# 也可以不用 task，直接在终端跑（拷进项目后）：
+.zed/bdl/init-project/init-project.sh \
   -t tiptop@192.168.1.19 -r /u1/topprod -d ~/tiptop-gp \
   --update --from-encoding gbk
 
-scripts/init-project/init-project.sh -t <user@host> -r /u1/topprod -d <本地目录> --dry-run
+.zed/bdl/init-project/init-project.sh -t <user@host> -r /u1/topprod -d <本地目录> --dry-run
 ```
 
 ```powershell
 # Windows：生产端 tar 打包 → scp 回本地 → 解压 → 清理两端中间文件
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\init-project\init-project.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .zed\bdl\init-project\init-project.ps1 `
   -Target tiptop@192.168.1.19 -RemoteRoot /u1/topprod -Dest D:\code\topprod-gp `
   -Region 1 -Update -FromEncoding gbk
 ```

@@ -406,6 +406,52 @@ def main() -> int:
         else:
             ok("[bash] ext.build.* 覆盖生效（映射成 Zed 变量，未配置的保持默认）")
 
+    # 场景五：生成的 task 里引用的**脚本文件必须真的存在**。
+    #   踩过的坑：init-project 那条 task 指向用户填的路径（可能是 ".ps1" 这种
+    #   相对路径或根本不存在的文件）→ 点下去必然失败，而生成脚本当时不报错。
+    #   现在脚本会被拷进项目 .zed/bdl/init-project/，task 写项目内绝对路径。
+    with tempfile.TemporaryDirectory(prefix="bdl-init-taskfile-") as tmp:
+        root = Path(tmp)
+        run_generator(root, "bash")
+        tasks_path = root / ".zed" / "tasks.json"
+        if not tasks_path.is_file():
+            fail("生成 tasks.json 失败，无法校验 task 引用的文件")
+        else:
+            tasks = json.loads(tasks_path.read_text(encoding="utf-8"))
+            missing = []
+            checked = 0
+            for task in tasks:
+                args = task.get("args") or []
+                for a in args:
+                    if not isinstance(a, str):
+                        continue
+                    # 只查看起来是脚本文件的参数（含 .sh/.ps1/.py/.cmd）
+                    if not a.endswith((".sh", ".ps1", ".py", ".cmd")):
+                        continue
+                    checked += 1
+                    # 相对路径按 task 的 cwd（= 项目根）解析
+                    p = Path(a)
+                    if not p.is_absolute():
+                        p = root / a
+                    if not p.is_file():
+                        missing.append(f"{task.get('label')} → {a}")
+            if missing:
+                for m in missing:
+                    fail(f"[bash] task 引用的脚本文件不存在：{m}")
+            else:
+                ok(f"[bash] {checked} 个 task 引用的脚本文件都存在")
+
+            # init-project 那条 task 必须真的能跑起来
+            init_tasks = [t for t in tasks if "初始化项目" in (t.get("label") or "")]
+            if not init_tasks:
+                fail("[bash] 没有生成「4gl: 初始化项目」task")
+            else:
+                script = Path(init_tasks[0]["args"][-1])
+                if not script.is_file():
+                    fail(f"[bash] 初始化项目 task 指向的脚本不存在：{script}")
+                else:
+                    ok("[bash] 初始化项目 task 指向仓库自带的 init-project 脚本")
+
     if PS1.is_file() and shutil.which("pwsh"):
         with tempfile.TemporaryDirectory(prefix="bdl-init-ps-") as tmp:
             root = Path(tmp)

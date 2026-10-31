@@ -289,8 +289,19 @@ $localRoot = Ask '本地根（相对项目根，默认 .）' (Get-Prev 'prod.loc
 if ([string]::IsNullOrEmpty($localRoot)) { $localRoot = '.' }
 $transport = Ask-Transport (Get-Prev 'prod.transport' 'off')
 
-Write-Section '4/4 init-project 脚本（可留空 = 不生成这条 task）'
-$initScript = Ask 'init-project 脚本路径（.sh 或 .ps1；空 = 跳过「初始化项目」task）' (Get-Prev 'initProject.script')
+Write-Section '4/4 init-project 脚本（回车 = 用仓库自带的；填路径 = 用你自己的）'
+# 默认用**仓库自带的** scripts/init-project/init-project.ps1 —— 它与 VSCode 侧是同一套
+# （从生产服务器拉代码）。以前这里默认留空、让用户自己填路径，结果生成的 task
+# 指向一个**并不存在**的文件，点下去必然失败。
+$defaultInitScript = ''
+foreach ($cand in @(
+    (Join-Path $PSScriptRoot '../init-project/init-project.ps1'),
+    (Join-Path $PSScriptRoot '../../scripts/init-project/init-project.ps1')
+)) {
+    if (Test-Path -LiteralPath $cand) { $defaultInitScript = (Resolve-Path -LiteralPath $cand).Path; break }
+}
+$initScript = Ask 'init-project 脚本路径（回车=用仓库自带；填 .sh/.ps1 路径=用你自己的；填 skip=不生成这条 task）' $defaultInitScript
+if ($initScript -eq 'skip' -or $initScript -eq 'none') { $initScript = '' }
 
 # 区 → login-profile（区 4 = Browser-based，不传 -login-profile）
 $loginProfile = ''
@@ -657,12 +668,34 @@ Pop-Location
 # 其它（.sh / .cmd / 无后缀）→ bash <路径>，与 bash 版一致。
 $initTail = ''
 if (-not [string]::IsNullOrEmpty($initScript)) {
+    # ★ 脚本会被**拷进项目** .zed/bdl/init-project/，task 里写**项目内的绝对路径**。
+    #   原因：用户填的路径（尤其是相对路径或 .ps1）不一定解析得到 ——
+    #   之前生成的 task 指向一个不存在的文件，点下去必然失败。
+    $projInitDir = Join-Path $zedDir 'bdl/init-project'
+    New-Item -ItemType Directory -Force -Path $projInitDir | Out-Null
+
+    if (Test-Path -LiteralPath $initScript -PathType Container) {
+        Copy-Item -Recurse -Force -Path (Join-Path $initScript '*') -Destination $projInitDir -ErrorAction SilentlyContinue
+    } else {
+        Copy-Item -Force -LiteralPath $initScript -Destination $projInitDir -ErrorAction SilentlyContinue
+    }
+    # init-project.ps1 用 $PSScriptRoot 找 templates/ 与 detect-encoding.py，必须同目录
+    $srcDir = Split-Path -Parent $initScript
+    if (Test-Path (Join-Path $srcDir 'templates')) {
+        Copy-Item -Recurse -Force -Path (Join-Path $srcDir 'templates') -Destination $projInitDir -ErrorAction SilentlyContinue
+    }
+    if (Test-Path (Join-Path $srcDir 'detect-encoding.py')) {
+        Copy-Item -Force -Path (Join-Path $srcDir 'detect-encoding.py') -Destination $projInitDir -ErrorAction SilentlyContinue
+    }
+
     if ($initScript.EndsWith('.ps1', [System.StringComparison]::Ordinal)) {
         $initCmd = 'pwsh'
-        $initArgs = '["-File", "' + (ConvertTo-JsonText $initScript) + '"]'
+        $foundInit = Join-Path $projInitDir 'init-project.ps1'
+        $initArgs = '["-File", "' + (ConvertTo-JsonText $foundInit) + '"]'
     } else {
         $initCmd = 'bash'
-        $initArgs = '["' + (ConvertTo-JsonText $initScript) + '"]'
+        $foundInit = Join-Path $projInitDir 'init-project.sh'
+        $initArgs = '["' + (ConvertTo-JsonText $foundInit) + '"]'
     }
     $initTailTmpl = @'
 ,

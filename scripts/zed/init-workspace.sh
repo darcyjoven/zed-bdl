@@ -302,9 +302,25 @@ LOCAL_ROOT="$ANS"
 ask_transport "${prev_transport:-off}"
 TRANSPORT="$ANS"
 
-section "4/4 init-project 脚本（可留空 = 不生成这条 task）"
-ask "init-project 脚本路径（.sh 或 .ps1；空 = 跳过「初始化项目」task）" "$prev_init_script"
+section "4/4 init-project 脚本（回车 = 用仓库自带的；填路径 = 用你自己的）"
+# 默认用**仓库自带的** scripts/init-project/init-project.sh —— 它与 VSCode 侧是同一套
+# （从生产服务器 rsync 拉代码）。以前这里默认留空、让用户自己填路径，结果生成的 task
+# 指向一个**并不存在**的文件（`.ps1` / 相对路径），点下去必然失败。
+#
+# 脚本会被拷进项目 `.zed/bdl/init-project/`，task 里写**项目内的绝对路径**，
+# 这样拷进项目后 task 一定能找到（相对路径在 Zed 的 task 里按 cwd 解析，容易踩坑）。
+DEFAULT_INIT_SCRIPT=""
+SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for cand in "$SCRIPT_DIR_ABS/../init-project/init-project.sh" \
+            "$SCRIPT_DIR_ABS/../../scripts/init-project/init-project.sh"; do
+    if [ -f "$cand" ]; then DEFAULT_INIT_SCRIPT="$cand"; break; fi
+done
+ask "init-project 脚本路径（回车=用仓库自带；填 .sh/.ps1 路径=用你自己的；填 skip=不生成这条 task）" \
+    "$DEFAULT_INIT_SCRIPT"
 INIT_SCRIPT="$ANS"
+if [ "$INIT_SCRIPT" = "skip" ] || [ "$INIT_SCRIPT" = "none" ]; then
+    INIT_SCRIPT=""
+fi
 
 # 区 → login-profile（区 4 = Browser-based，不传 -login-profile）
 case "$REGION" in
@@ -582,12 +598,65 @@ JSON
 )
 
 # 可选的「初始化项目」task（追加在数组末尾，避免额外的逗号处理）
+#
+# ★ 脚本会被**拷进项目** `.zed/bdl/init-project/`，task 里写**项目内的绝对路径**。
+#   原因：用户填的路径（尤其是相对路径或 `.ps1`）在 Zed 的 task 里不一定解析得到 ——
+#   之前生成的 task 指向一个不存在的文件，点下去必然失败。
+#   拷进项目后，路径一定存在，且跟着项目走（换机器也能用）。
 INIT_TAIL=""
+INIT_SCRIPT_COPIED=""
 if [ -n "$INIT_SCRIPT" ]; then
     case "$INIT_SCRIPT" in
-        *.ps1) INIT_CMD="pwsh"; INIT_ARGS="[\"-File\", \"$(json_escape "$INIT_SCRIPT")\"]" ;;
-        *)     INIT_CMD="bash"; INIT_ARGS="[\"$(json_escape "$INIT_SCRIPT")\"]" ;;
+        *.ps1) INIT_CMD="pwsh" ;;
+        *)     INIT_CMD="bash" ;;
     esac
+
+    # 拷进项目（连同 templates/ 与 detect-encoding.py —— init-project.sh 依赖它们）
+    PROJ_INIT_DIR="$ZED_DIR/bdl/init-project"
+    mkdir -p "$PROJ_INIT_DIR"
+    # 拷**整个目录**（.sh + .ps1 + templates/ + detect-encoding.py 都带上）：
+    # 跨平台时 task 用的后缀可能与用户填的那个不同（Linux 填 .sh、Windows 填 .ps1），
+    # 只拷一个文件会导致另一端找不到脚本。
+    INIT_SRC_DIR=""
+    if [ -d "$INIT_SCRIPT" ]; then
+        INIT_SRC_DIR="$INIT_SCRIPT"
+    else
+        INIT_SRC_DIR="$(dirname "$INIT_SCRIPT")"
+    fi
+    if [ -n "$INIT_SRC_DIR" ] && [ -d "$INIT_SRC_DIR" ]; then
+        # 只拷 init-project 相关的文件，别把用户整个目录搬进来
+        for f in "$INIT_SRC_DIR"/init-project.sh "$INIT_SRC_DIR"/init-project.ps1 \
+                 "$INIT_SRC_DIR"/detect-encoding.py "$INIT_SRC_DIR"/README.md; do
+            [ -f "$f" ] && cp "$f" "$PROJ_INIT_DIR/" 2>/dev/null || true
+        done
+        [ -d "$INIT_SRC_DIR/templates" ] && cp -R "$INIT_SRC_DIR/templates" "$PROJ_INIT_DIR/" 2>/dev/null || true
+    fi
+    # 用户填的是目录里的某个文件时，保证它本身也被拷进去
+    if [ ! -d "$INIT_SCRIPT" ] && [ -f "$INIT_SCRIPT" ]; then
+        cp "$INIT_SCRIPT" "$PROJ_INIT_DIR/" 2>/dev/null || true
+    fi
+
+    if [ "$INIT_CMD" = "pwsh" ]; then
+        # Windows：优先用 .ps1；没有就退回 .sh（bash 版在 Git Bash/WSL 下也能跑）
+        FOUND_INIT="$(ls "$PROJ_INIT_DIR"/*.ps1 2>/dev/null | head -1)"
+        if [ -z "$FOUND_INIT" ]; then
+            FOUND_INIT="$(ls "$PROJ_INIT_DIR"/*.sh 2>/dev/null | head -1)"
+            [ -n "$FOUND_INIT" ] && INIT_CMD="bash"
+        fi
+        [ -n "$FOUND_INIT" ] || FOUND_INIT="$PROJ_INIT_DIR/init-project.ps1"
+        if [ "$INIT_CMD" = "pwsh" ]; then
+            INIT_ARGS="[\"-File\", \"$(json_escape "$FOUND_INIT")\"]"
+        else
+            INIT_ARGS="[\"$(json_escape "$FOUND_INIT")\"]"
+        fi
+    else
+        FOUND_INIT="$(ls "$PROJ_INIT_DIR"/*.sh 2>/dev/null | head -1)"
+        [ -n "$FOUND_INIT" ] || FOUND_INIT="$PROJ_INIT_DIR/init-project.sh"
+        INIT_ARGS="[\"$(json_escape "$FOUND_INIT")\"]"
+    fi
+    chmod +x "$FOUND_INIT" 2>/dev/null || true
+    INIT_SCRIPT_COPIED="$FOUND_INIT"
+
     # shellcheck disable=SC2016  # $ZED_WORKTREE_ROOT 是给 Zed 的
     printf -v INIT_TAIL ',\n  {\n    "label": "4gl: 初始化项目（从生产服务器拉取代码）",\n    "command": "%s",\n    "args": %s,\n    "cwd": "$ZED_WORKTREE_ROOT",\n    "use_new_terminal": false,\n    "reveal": "always"\n  }' "$INIT_CMD" "$INIT_ARGS"
 fi
@@ -988,6 +1057,8 @@ cat <<'EOF'
    或用环境变量 BDL_ORA_PASSWORD。tiptop 只从这两处取密码。
 6) .gitignore 建议：.zed/settings.json（含主机/账号）、.project/secrets.json；
    .zed/tasks.json 与 .zed/bdl-tool.json 不含密码，可以提交。
+   .zed/bdl/ 下是脚本（init-project/、migrate-data.*、init-workspace.*），不含密码，也可以提交；
+   想保持仓库干净就整个忽略 .zed/bdl/。
 7) 本脚本自己不在生成的 tasks.json 里。想以后在 Zed 里一键重跑，先把脚本放进项目：
      mkdir -p .zed/bdl && cp -r <zed-bdl 仓库>/scripts/zed/* .zed/bdl/
    然后手工加一条 task：

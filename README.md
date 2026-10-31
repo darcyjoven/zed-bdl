@@ -327,7 +327,7 @@ export PATH="/code/workspace/tree-sitter-per/node_modules/.bin:$PATH"
 export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs           # query 47 项（节点名 / 关键字覆盖 / 真实语料编译）
 cargo test                              # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
-python3 tests/verify-init-script.py     # 初始化脚本产物 15 项（核心；task 齐全 / 字段白名单 / 无 ${…} / deploy.json / 迁移 helper / ext.build 覆盖）
+python3 tests/verify-init-script.py     # 初始化脚本产物 17 项（核心；task 齐全 / 字段白名单 / 无 ${…} / deploy.json / 迁移 helper / ext.build 覆盖）
                                       # 有 pwsh 时另加 10 项 PowerShell 实跑（额外项，不计入 15）
 python3 tests/verify-docs.py            # 文档契约 11 项（版本三处一致 / 命令与护栏数字对拍 / 无过期引用）
 python3 tests/verify-release-workflow.py # 发布流水线 21 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器 / wasm 与 BUILD-INFO 独立 job）
