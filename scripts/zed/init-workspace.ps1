@@ -938,7 +938,7 @@ if ([string]::IsNullOrEmpty($loginProfile)) {
 
 Write-Warn '若填了 Oracle 连接：link.mode / schema.mode 仍写作 off（轻量档）。'
 Write-Warn '  * 用 CSV 导入资料后，把 .zed\settings.json 里的 link.mode / schema.mode 改成 "file"；'
-Write-Warn '  * 要直连库采集，改成 "db"。改完 settings 需要重启 bdl-lsp。'
+Write-Warn '  * 要直连库采集，改成 "db"。改完一般**不用重启**（Zed 会推 didChangeConfiguration，bdl-lsp 热应用）；只有改 binary.path / arguments 才要重启。'
 Write-Warn '「4gl: 链接资料：从 CSV 导入」/「4gl: 字段资料：从 CSV 导入」里的 <CSV 绝对路径> 是占位符，跑之前要改成你的 CSV 路径。'
 Write-Warn '「4gl: 链接资料：按模组更新」里的 -modules lib,sub,qry 是示例，按需改成你的全局模组名。'
 
@@ -955,7 +955,8 @@ Write-Host @'
 4) 资料模式：默认 "off"（轻量档，不连库、不写工作区）；
    * 只用 CSV 导入 → 导入后在 .zed\settings.json 把 link.mode / schema.mode 改成 "file"；
    * 直连 Oracle 采集 → 改成 "db"。
-   改完记得重启 bdl-lsp（Zed 的 lsp command selector → restart），设置只在服务器启动时下发。
+   改完**一般不用重启**（Zed 会推 workspace/didChangeConfiguration，bdl-lsp 热应用并重算诊断）；
+   只有改 binary.path / arguments（进程启动参数）才需要重启（命令面板 editor: restart language server）。
 5) 密码**不在**本脚本里、也不在生成的文件里：
    写 <项目根>\.project\secrets.json（内容 {"<用户名>":"<密码>"}；
    Windows 不校验文件权限，Unix 必须 chmod 600），或用环境变量 BDL_ORA_PASSWORD。
