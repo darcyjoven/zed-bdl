@@ -522,7 +522,7 @@ export HOME=/code/workspace/bdl-lsp/artifacts/home
 node tests/verify-queries.mjs                          # query 47 项（含真实语料 15 文件 ×2 语言）
 cargo test                                             # 单元测试（配置合并 / ext 剥离 / 轻量档默认 / 资料解析）
 python3 tests/verify-init-script.py                     # 初始化脚本产物 15 项（R12 无 ${…}、task 齐全、字段白名单、deploy.json、迁移 helper、ext.build 覆盖）
-python3 tests/verify-docs.py                            # 文档契约 10 项（版本三处一致 / 命令条数与护栏数字对拍 / 无过期引用）
+python3 tests/verify-docs.py                            # 文档契约 11 项（版本三处一致 / 命令条数与护栏数字对拍 / 无过期引用）
 python3 tests/verify-release-workflow.py                # 发布流水线 21 项（资产名与扩展解析逻辑对拍 / 矩阵 / 触发器 / wasm 与 BUILD-INFO 独立 job）
 source /code/workspace/bdl-lsp/scripts/dev-env.sh
 cargo check --target wasm32-wasip2
@@ -616,7 +616,7 @@ cargo build --release --target wasm32-wasip2           # 产物：target/wasm32-
 > 实跑中连踩四个坑（Windows shell / BUILD-INFO 同名覆盖 / job 缺 checkout /
 > upload-artifact 的 LCA），每个都补了对应护栏（release 21 项）。
 >
-> 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **15** 项 · release **21** 项 · 文档 **10** 项 · query **47** 项 · `cargo test` **17** 项 · wasm 315 KB。
+> 护栏现状（**核心项数**，与环境无关）：清单 **17** 项 · init-script **15** 项 · release **21** 项 · settings **3** 项 · 文档 **11** 项 · query **47** 项 · `cargo test` **17** 项 · wasm 315 KB。
 >
 > > init-script 的「15 项」指**核心项数**（bash 版）。装了 pwsh 的机器（CI runner 自带）
 > > 还会额外跑 PowerShell 版 **10 项**，总项数变成 25 —— 那是**额外项**，不计入契约。

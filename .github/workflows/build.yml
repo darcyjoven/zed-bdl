@@ -89,6 +89,12 @@ jobs:
         working-directory: zed-extension
         run: python3 tests/verify-init-script.py
 
+      - name: 校验文档里的 settings.json 示例能被 Zed 接受
+        # Zed 的 settings.json 有 schema，写错键名会被编辑器拒绝
+        # （"Property editor is not allowed."）—— 本仓库已经踩过两次。
+        working-directory: zed-extension
+        run: python3 tests/verify-settings-json.py
+
       - name: 校验发布流水线与扩展实现一致
         # 发布产物里的资产名必须和扩展运行时解析的名字完全一致：
         # 对不上时不会编译失败、不会 CI 变红，只在用户装扩展时炸。
